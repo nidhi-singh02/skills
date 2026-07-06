@@ -1,0 +1,9 @@
+# Python dependencies for shorts-from-takes (scripts/build.py).
+#
+# System tools — NOT pip-installable, install separately:
+#   ffmpeg, ffprobe   ->  https://ffmpeg.org/download.html  (brew install ffmpeg)
+#
+# Zero-setup alternative (no venv, no install step):
+#   uv run --with pillow python scripts/build.py <spec.json>
+
+pillow>=10.0

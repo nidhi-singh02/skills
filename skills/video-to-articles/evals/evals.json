@@ -1,0 +1,60 @@
+{
+  "skill_name": "video-to-articles",
+  "notes": "Run each prompt with the skill in a fresh session. Setup: copy the CONTENTS of the eval's fixtures dir (each 'files' entry is relative to evals/) into a fresh working directory first, so the paths named in the prompt exist. Grade with scripts/verify_article.py plus the assertions below. Eval 2 deliberately has NO screenshots and NO repo; eval 3 targets LinkedIn. The fixture .jpgs are tiny placeholders: they only need to exist so [📷]/[FIGURE:] markers resolve.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "build-debug-to-x",
+      "prompt": "I recorded a 25-minute build-along where I set up a local RAG pipeline and lost an hour to a wrong chunk-size setting before it worked. Transcript is in edit/transcripts/rag.json and screenshots are in blog/assets/ (pipeline.jpg, error.jpg, fix.jpg, win.jpg). My repo is github.com/example/rag-local-setup. Turn it into an X article I can post.",
+      "expected_output": "blog/x-article.md + blog/x-article.html + a cover. Build/debug archetype: the wrong-chunk-size wall is the centerpiece. Launch post linkless and <=280 chars; repo only in Reply B; 3-4 title options offered before drafting; one paragraph per line; verify_article.py passes.",
+      "files": [
+        "fixtures/eval1-build-debug/edit/transcripts/rag.json",
+        "fixtures/eval1-build-debug/blog/assets/pipeline.jpg",
+        "fixtures/eval1-build-debug/blog/assets/error.jpg",
+        "fixtures/eval1-build-debug/blog/assets/fix.jpg",
+        "fixtures/eval1-build-debug/blog/assets/win.jpg"
+      ],
+      "assertions": [
+        "verify_article.py exits 0 on blog/x-article.md with --platform x",
+        "a story-spine file was written before the article",
+        "3-4 title/hook candidates were presented with a recommendation before the full draft",
+        "the debugging wall (chunk size) is the longest article section",
+        "an x-article.html twin exists whose visible text matches the md payload"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "essay-no-assets-to-medium",
+      "prompt": "I filmed a 15-minute talking-head video arguing that most AI agent demos are misleading. No screenshots, no repo, just the transcript at transcript.txt. I want a Medium article from it.",
+      "expected_output": "blog/medium-article.md + .html + a text-only cover. Opinion/essay archetype (claim -> case -> counter-argument -> close). Zero [📷] markers (no images exist), no repo link invented, SEO title + subtitle, verify_article.py passes with --platform medium.",
+      "files": [
+        "fixtures/eval2-essay-medium/transcript.txt"
+      ],
+      "assertions": [
+        "verify_article.py exits 0 on blog/medium-article.md with --platform medium",
+        "no image markers or figure placeholders reference files that don't exist",
+        "no repository or external project link was fabricated",
+        "the cover is text-only (no logo/diagram nodes)",
+        "the arc is argument-shaped, not setup/debug-shaped"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "howto-to-linkedin",
+      "prompt": "My video shows how I plan my week in Notion in 20 minutes. Transcript is at transcript.txt, and I have 3 screenshots in blog/assets (board.jpg, template.jpg, review.jpg). No repo. Write me a LinkedIn post for it.",
+      "expected_output": "blog/linkedin-post.md. How-to/process archetype ('the part people get wrong' as the centerpiece). ~150-250 words, plain text (no ## or ** in payload), no link in the post and no fabricated repo comment, 0-3 hashtags, multi-image note for the 3 screenshots, verify_article.py passes with --platform linkedin.",
+      "files": [
+        "fixtures/eval3-howto-linkedin/transcript.txt",
+        "fixtures/eval3-howto-linkedin/blog/assets/board.jpg",
+        "fixtures/eval3-howto-linkedin/blog/assets/template.jpg",
+        "fixtures/eval3-howto-linkedin/blog/assets/review.jpg"
+      ],
+      "assertions": [
+        "verify_article.py exits 0 on blog/linkedin-post.md with --platform linkedin",
+        "post body is 150-250 words and contains no markdown formatting tokens",
+        "no repo/link comment was invented (video has none)",
+        "the centerpiece is the non-obvious step of the method, not a debugging wall"
+      ]
+    }
+  ]
+}

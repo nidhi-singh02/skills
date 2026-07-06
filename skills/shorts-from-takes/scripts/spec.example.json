@@ -1,0 +1,19 @@
+{
+  "_comment": "WORKED EXAMPLE. Copy to spec.json and edit. Hand it ANY clips — alternate takes, separate shots, or existing reels — and it assembles them top-to-bottom into one vertical Short. Replace every /ABSOLUTE/PATH/... path. Per segment: 'kind' is OPTIONAL (portrait/landscape auto-detected from the source; legacy 'face'/'laptop' still accepted); set 'grade': true on talking-head/skin shots for a warm relight; on wide clips use 'fit': 'cover' to crop full-frame or omit it for a blurred fill. 'beat' is a free-text label for your own reference. 'blocks' group consecutive same-orientation clips (hard cuts inside a block; a 0.2s crossfade fires between blocks). Anything omitted falls back to house-style DEFAULTS in build.py. Full schema + rules: references/render-notes.md.",
+  "version": "v1",
+  "output_dir": "/ABSOLUTE/PATH/TO/your-project/edit",
+  "transcripts_dir": "transcripts",
+  "title": "Your punchy on-screen title",
+  "name_fix": { "CLAWED": "CLAUDE" },
+
+  "segments": [
+    { "src": "/ABSOLUTE/PATH/TO/your-project/clip_hook.mov",  "start": 26.30,  "end": 39.05,  "grade": true, "beat": "HOOK" },
+    { "src": "/ABSOLUTE/PATH/TO/your-project/clip_hook.mov",  "start": 88.50,  "end": 101.25, "grade": true, "beat": "SETUP" },
+    { "src": "/ABSOLUTE/PATH/TO/your-project/screen_or_broll.mov", "start": 27.15, "end": 37.20, "beat": "SHOW" },
+    { "src": "/ABSOLUTE/PATH/TO/your-project/wide_shot.mov",  "start": 164.30, "end": 174.45, "kind": "landscape", "fit": "cover", "beat": "PROOF" },
+    { "src": "/ABSOLUTE/PATH/TO/your-project/clip_hook.mov",  "start": 146.80, "end": 153.10, "grade": true, "beat": "PAYOFF" },
+    { "src": "/ABSOLUTE/PATH/TO/your-project/clip_close.mov", "start": 227.95, "end": 231.95, "grade": true, "beat": "CTA" }
+  ],
+
+  "blocks": [[0, 1], [2, 3], [4], [5]]
+}
