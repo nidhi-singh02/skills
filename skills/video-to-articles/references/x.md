@@ -29,9 +29,9 @@ Medium and LinkedIn packs use the same scaffolding (see `medium.md` / `linkedin.
   Bookmarks are heavily weighted, so save-worthy content wins.
 - Long-form dwell time boosts distribution; hashtags are near-useless (0-1 max).
 - Good windows: Tue-Thu, mid-morning in the audience's timezone.
-If these numbers are stale, spot-check with a web search before leaning on them; the *structure*
-below (linkless launch post, link in a reply, question reply) degrades gracefully even if the exact
-multipliers moved.
+
+The structure below (linkless launch post, link in a reply, question reply) holds even if the exact
+multipliers move; the as-of date above governs when to re-verify the numbers.
 
 ## 1. LAUNCH POST
 The tweet that carries the Article. Linkless (the Article card attaches natively). Hook-first, the
@@ -61,4 +61,4 @@ Order of operations (reverse of the file): publish the Article first via the .ht
 button (headings/bold paste formatted; replace 📷 placeholder blocks with real uploads) → copy the
 Article URL → launch post (do NOT paste the URL; let X attach the card; if images exist, attach a
 2-4 image set for feed dwell) → Reply A → Reply B (if any) → win the first hour (seed a value reply,
-answer early comments fast) → Day-2 quote-tweet with a surprising stat from the article.
+answer early comments fast) → Day-2 quote-tweet with the single most surprising line or number from the article.

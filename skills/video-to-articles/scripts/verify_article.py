@@ -36,7 +36,13 @@ CMD_PREFIX = ("git ", "cd ", "cp ", "mv ", "docker ", "curl ", "ollama ", "pip "
               "python", "mkdir ", "img2pdf ", "pdfunite ", "for ", "sips ")
 ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,}=")
 LIST_RE = re.compile(r"^(\d+[.)]\s|[-*+]\s)")
-GREET_RE = re.compile(r"^(hi|hey|hello|yo)\s+(guys|everyone|all|folks|friends)\b", re.I | re.M)
+GREET_RE = re.compile(
+    r"^(hi|hey+|hello|yo|hiya|howdy|sup|greetings|good\s+(?:morning|afternoon|evening)|"
+    r"what'?s\s+up|welcome)\b", re.I)
+MD_LINK_RE = re.compile(r"\[[^\]]+\]\([^)]+\)")          # [text](url)
+MD_HEAD_RE = re.compile(r"^\s*#{1,6}\s")                 # any # heading (incl single #)
+MD_EMPH_RE = re.compile(r"(\*\*|__|(?<![\w*])\*[^*\s][^*]*\*(?![\w*])"
+                        r"|(?<![\w_])_[^_\s][^_]*_(?![\w_]))")   # bold or *italic*/_italic_
 MARKER_RE = re.compile(r"\[" + CAMERA + r"(.*?)\]", re.S)
 FIGURE_RE = re.compile(r"\[FIGURE:(.*?)\]", re.S | re.I)
 PATH_RE = re.compile(r"[\w./-]+\.(?:png|jpe?g|webp|gif)", re.I)
@@ -115,6 +121,9 @@ def main() -> int:
                     help="skip the html-twin parity check (intentionally md-only run)")
     args = ap.parse_args()
 
+    if not args.file.exists():
+        print("verify_article.py: file not found: %s" % args.file)
+        return 1
     text = args.file.read_text(encoding="utf-8")
     lines = text.splitlines()
     plat = args.platform or ("x" if "x-article" in args.file.name
@@ -147,10 +156,23 @@ def main() -> int:
     (fails if wraps else ok).append(
         "wrapped paragraphs: " + ("suspected at lines " + str(wraps[:10]) if wraps else "none"))
 
-    # 3. greeting opener
-    greet = GREET_RE.search(text)
+    # 3. greeting opener — check the opener line of each payload zone, not the whole
+    # file, so a greeting quoted in a scaffolding note doesn't false-fail.
+    greet = None
+    inside = fresh = False
+    for l in lines:
+        s = l.rstrip("\n")
+        if re.match(r"^-{20,}\s*$", s):
+            inside = True; fresh = True; continue
+        if re.match(r"^={20,}\s*$", s):
+            inside = False; continue
+        if inside and fresh and s.strip() and not is_scaffold(s):
+            fresh = False
+            mm = GREET_RE.match(s.strip())
+            if mm:
+                greet = mm.group(0); break
     (fails if greet else ok).append(
-        "greeting opener: " + ("FOUND (" + greet.group(0) + ")" if greet else "none"))
+        "greeting opener: " + ("FOUND (" + greet + ")" if greet else "none"))
 
     # 4. image markers resolve
     missing = []
@@ -187,7 +209,8 @@ def main() -> int:
         (fails if fences % 2 else ok).append(
             "code fences: %d markers (%s)" % (fences, "UNBALANCED" if fences % 2 else "balanced"))
     elif plat == "linkedin":
-        fmt = [i for i, l in payload_zones(lines) if l.startswith("## ") or "**" in l]
+        fmt = [i for i, l in payload_zones(lines)
+               if MD_HEAD_RE.match(l) or MD_EMPH_RE.search(l) or MD_LINK_RE.search(l)]
         (fails if fmt else ok).append(
             "plain-text payload: " + ("markdown tokens at " + str(fmt[:10]) if fmt else "clean"))
 
@@ -202,7 +225,7 @@ def main() -> int:
             p.feed(twin.read_text(encoding="utf-8"))
             hay = _norm(" ".join(p.parts))
             drift = [n for n, l in payload_zones(lines)
-                     if not is_scaffold(l) and len(_norm(l)) > 60 and _norm(l) not in hay]
+                     if not is_scaffold(l) and len(_norm(l)) > 25 and _norm(l) not in hay]
             (fails if drift else ok).append(
                 "html twin parity: " + ("md paragraphs missing from html at lines "
                                         + str(drift[:10]) if drift else "in sync"))

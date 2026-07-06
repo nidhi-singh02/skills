@@ -13,8 +13,8 @@ search before leaning on specifics.
 - **Title + subtitle are SEO, not a curiosity hook.** Medium is indexed by Google/AI-search. Title
   ~50-60 chars with the primary keyword up front, in sentence/title case (readable in search
   results). Then a subtitle field that carries the story/hook (this is where the creator's own
-  voice can live). Example: title `Self-Hosting Your Analytics Dashboard for $0` + subtitle
-  `My free credits were about to run out, so I moved everything local`.
+  voice can live). Example: title `The Weeknight Ramen That Beats Takeout` + subtitle
+  `I spent a month failing at broth so you can nail it on the first try`.
 - **Real code blocks come back.** Medium has native, syntax-highlighted, copyable code blocks. Put
   the actual commands and config in fenced ```blocks```. Do NOT screenshot code, Medium code
   screenshots have no alt text and are inaccessible. The full config can also be a GitHub Gist embed.
@@ -35,7 +35,7 @@ A short "how to get this into Medium" note (lead with the html twin's Copy butto
 carries headings/bold/links/lists; note that a flattened code block is fixed by retyping ``` on it),
 then the `TITLE` / `SUBTITLE` / `FEATURED IMAGE` / `TAGS` fields, then the body with real fenced
 code blocks, `[FIGURE: path | caption]` markers, and inline links. One paragraph per line in the md.
-Keep the voice, keep zero em dashes, keep the accuracy. Use the same pack scaffolding as the X pack
+Medium's editor preserves em dashes you paste, so the no-em-dash rule still bites here. Use the same pack scaffolding as the X pack
 (ALL-CAPS labels with `====` banner lines; copyable payload between `----` and `====` lines, per
 the layout block in `x.md`): `verify_article.py` only checks payload inside those zones and fails a
 file with none.

@@ -7,10 +7,11 @@ description: >-
   paste-ready HTML twin) plus a fresh cover image, in the creator's own voice. Use whenever the user
   wants a video, its transcript, or its screenshots turned into an X, Medium, or LinkedIn article,
   blog, or post (e.g. "make an X article from this video", "write a medium post from my recording"),
-  or wants an existing long-form blog adapted for those platforms. Prefer this over generic writing
+  or wants an existing blog or post adapted for those platforms. Prefer this over generic writing
   when the source is a video or transcript and the destination is X, Medium, or LinkedIn. Do NOT use
-  for: YouTube titles/descriptions/thumbnails, cutting shorts/reels, transcribing a video,
-  scheduling/posting, or a swipeable LinkedIn carousel (separate skill).
+  for: summarizing or taking notes on a video (this ships a publish-ready post), YouTube
+  titles/descriptions/thumbnails, cutting shorts/reels, transcribing a video, scheduling/posting,
+  or a swipeable LinkedIn carousel (separate skill).
 ---
 
 # Video → article (X / Medium / LinkedIn)
@@ -66,13 +67,12 @@ create it if missing, and ask where to put it if the working directory is unclea
 Write `blog/story-spine.md` first: ~15 lines holding the confirmed facts and true numbers, the
 archetype + centerpiece, and the three attention slots (cover payoff / title story / first-line
 angle). Every platform piece derives from the spine, so multi-platform runs never drift factually
-and nothing gets re-derived. It's working scratch, not a publishable deliverable.
+and nothing gets re-derived.
 
 Then the **taste gate**: never ship your first title. Present **3-4 title + hook-line candidates**,
 each a different hook type (number/result, time-saved, contrarian, transformation, curiosity gap),
 one line on why it works, and mark a recommendation. Let the creator pick (use a question tool when
-interactive). Record the winner in the spine. Titles are taste; options with tradeoffs beat a
-single guess.
+interactive). Record the winner in the spine.
 
 ### Step 4 — Write for the platform (read the matching reference)
 - **X (Twitter)** → `references/x.md` (launch post + replies + article + checklist)
@@ -90,8 +90,8 @@ profile, whatever it says. No profile and no posts? Write clean, plain sentence 
 creator the piece sharpens once they add one. Rules that hold in ANY voice:
 - **hook-first opener, never a greeting.** "hi guys" burns the scroll-stop; the first line is the
   pitch. Vocatives can appear later, just not as the first words.
-- **No em dashes** (— or --): they read as an AI tell. Periods, commas, colons. Hard zero by
-  default; only relax it if the creator's own profile uses them.
+- **No em dashes** (— or --): they read as an AI tell, so default to periods, commas, colons.
+  The one exception: a creator whose own profile uses them. The profile always wins.
 - **Keep the true rough edges.** Real numbers, losses next to wins, the creator's actual phrasings
   from the transcript. Sanded-smooth is how AI sounds; hard-won specifics are the hook.
 - **No AI slop**: no "dive in / without further ado", no "it's not just X, it's Y", no rule-of-three
@@ -118,8 +118,10 @@ creator the piece sharpens once they add one. Rules that hold in ANY voice:
   (select + `document.execCommand('copy')` copies rich text), and styled `📷 placeholder` blocks
   where images go (they paste as visible blocks the user replaces with uploads). Pasting rich text
   into X/Medium/LinkedIn Article editors carries headings and bold, so the user never re-applies
-  formatting by hand. LinkedIn feed posts are plain text: no html twin needed, the unwrapped md is
-  enough.
+  formatting by hand. `execCommand('copy')` is deprecated but still works from a `file://` twin
+  (the modern clipboard API needs HTTPS); if the button ever fails, the user can select the section
+  by hand and copy, and the md remains the source of truth. LinkedIn feed posts are plain text: no
+  html twin needed, the unwrapped md is enough.
 - The md is the source of truth; keep the html's text identical to it.
 
 ## No assets? (no screenshots / no repo)
@@ -165,6 +167,15 @@ Render per `references/cover-render.md` (localhost serve + Playwright at 1600×9
   sanitized copy of the outputs to the repo's `examples/`; and a **post-launch retro** 24-48h after
   posting (see `references/retro.md`): collect the real numbers, log what the audience actually
   rewarded to `## Learned`, so hook and archetype choices compound run over run.
+
+## Files
+- `references/x.md` · `medium.md` · `linkedin.md` — per-platform pack layout + algorithm facts (as-of dated).
+- `references/cover-render.md` — the localhost-serve + Playwright render flow; calls `scripts/fetch_logo.sh`.
+- `references/retro.md` — the 24–48h post-launch retro that feeds `## Learned`.
+- `scripts/verify_article.py` — the mechanical gate (run at Finish); `render_cover.sh` + `fetch_logo.sh` — cover helpers.
+- `assets/cover-text-template.html` (default) · `cover-template.html` (A→B→C diagram) · `cover-medium-template.html` (1600×840);
+  `voice-profile-template.md` — shape for a new profile; `departure.woff2` (+ license) — pixel display font for dev covers.
+- `evals/`, `examples/` — runnable eval fixtures + sanitized output samples.
 
 ## One example (build/debug archetype, for shape only)
 Imagine a build video about self-hosting an analytics dashboard. Its pack's launch post leads with
