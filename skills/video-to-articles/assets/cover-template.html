@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!--
+  X ARTICLE COVER TEMPLATE  (1600x900)
+  Proven editorial layout: Departure Mono headline TOP-left + a concept node-diagram below.
+  Render: serve this dir over localhost, screenshot at 1600x900 (see references/cover-render.md).
+
+  EDIT POINTS (search "EDIT:"):
+   1. Headline text + the violet accent span + the muted subline.
+   2. The 3 nodes: label, sublabel, logo image, glow colour, and which one is the hero (biggest).
+   3. Drop the brand logos + departure.woff2 into this same folder before rendering.
+  Not every video is a 3-node A->B->C story. If it isn't, delete the diagram and keep a
+  bold text-only headline cover. The diagram is one proven option, not mandatory.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face{font-family:departureMono;src:url('./departure.woff2') format('woff2');font-display:block;font-weight:400}
+  :root{
+    --bg:#0a0a0c; --ink:#f2f2f4; --ink-mut:#7b7b86; --line:#26262e;
+    --accent:#8b6cff;                 /* EDIT: one accent colour for the headline number/$ */
+    --display:departureMono,monospace; /* headline font. dev default; swap for warmer topics */
+    --glow:rgba(124,92,240,.14);       /* background glows are VIOLET by default — recolour to brand */
+    --glow2:rgba(86,211,166,.07);
+    --hero-glow:0 0 78px rgba(124,92,240,.5), 0 0 26px rgba(135,170,235,.45), 0 22px 60px rgba(91,63,214,.32);
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1600px;height:900px}
+  body{
+    background:var(--bg);color:var(--ink);overflow:hidden;
+    background-image:                  /* glows via vars — recolour --glow/--glow2 to the brand */
+      radial-gradient(1000px 640px at 50% 30%, var(--glow), transparent 62%),
+      radial-gradient(680px 420px at 88% 96%, var(--glow2), transparent 60%);
+  }
+  .frame{position:absolute;inset:0;padding:74px 96px}
+
+  /* ---- headline (top-left) ---- */
+  .title{position:absolute;left:96px;top:82px;right:96px}
+  .title h1{font-family:var(--display);font-size:50px;letter-spacing:0;color:var(--ink);line-height:1.5}
+  .title h1 .v{color:var(--accent)}    /* the number / $ accent. NO trailing period. */
+  .title .sub3{font-family:var(--display);font-size:24px;color:var(--ink-mut);margin-top:20px}
+
+  /* ---- concept diagram (nodes on ONE baseline + a single rail) ---- */
+  .stage{position:absolute;left:0;right:0;top:308px;height:560px}
+  .rail{position:absolute;left:330px;width:940px;top:200px;height:1px;z-index:1;
+        background:linear-gradient(90deg,transparent,#2c2c36 10%,#2c2c36 90%,transparent)}
+  .orb{position:absolute;top:200px;transform:translate(-50%,-50%);z-index:3}
+  /* dark logo disc (for logos that are white or recolour-to-white) */
+  .disc{border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(circle at 38% 30%, #20202a, #0d0d12 74%);
+        border:1px solid rgba(255,255,255,.09);position:relative}
+  .disc img.invert{filter:brightness(0) invert(1);opacity:.96}   /* recolour black logo -> white */
+  /* light disc (for a logo that needs a light background, e.g. a dark illustration) */
+  .disc.light{background:#f1efe8;overflow:hidden}
+  .disc.light img{width:100%;height:100%;object-fit:cover;object-position:48% 33%;transform:scale(1.22)}
+  /* hero node: bigger + stronger glow. use a brand logo that is itself a circle, or a disc. */
+  .hero{width:324px;height:324px;border-radius:50%;box-shadow:var(--hero-glow)}
+  .hero img{width:100%;height:100%;display:block;border-radius:50%}
+  /* labels — all aligned on one baseline so the row reads clean */
+  .lbl{position:absolute;top:404px;transform:translateX(-50%);text-align:center}
+  .lbl .nm{font-family:var(--display);font-size:38px;color:var(--ink);line-height:1}
+  .lbl .sb{font-family:var(--mono);font-size:17px;color:var(--ink-mut);margin-top:14px;line-height:1}
+</style>
+</head>
+<body>
+  <div class="frame">
+
+    <!-- EDIT: the concept diagram. left node -> hero (center) -> right node. -->
+    <div class="stage">
+      <div class="rail"></div>
+
+      <!-- left node: light disc holding a dark illustration logo -->
+      <div class="orb" style="left:330px">
+        <div class="disc light" style="width:196px;height:196px;box-shadow:0 0 60px rgba(120,140,180,.30)">
+          <img src="left_logo.png" alt="" />
+        </div>
+      </div>
+
+      <!-- center node: HERO (biggest). a brand logo that is already a circle works great here -->
+      <div class="orb" style="left:800px">
+        <div class="hero"><img src="hero_logo.svg" alt="" /></div>
+      </div>
+
+      <!-- right node: dark disc + a white (or recoloured-white) logo -->
+      <div class="orb" style="left:1270px">
+        <div class="disc" style="width:196px;height:196px;box-shadow:0 0 60px rgba(86,211,166,.30)">
+          <img class="invert" src="right_logo.png" alt="" style="height:120px" />
+        </div>
+      </div>
+
+      <!-- labels: all three share top:404 so they align regardless of node size -->
+      <div class="lbl" style="left:330px"><div class="nm">Left Node</div><div class="sb">subtitle</div></div>
+      <div class="lbl" style="left:800px"><div class="nm">Hero Node</div><div class="sb">subtitle</div></div>
+      <div class="lbl" style="left:1270px"><div class="nm">Right Node</div><div class="sb">subtitle</div></div>
+    </div>
+
+    <!-- EDIT: headline. Title Case, the accent on the number/$, NO trailing period. -->
+    <div class="title">
+      <h1>Your Benefit Headline<br>Ending In <span class="v">$0</span></h1>
+      <div class="sub3">(One Muted Qualifier Line)</div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  TEXT-ONLY COVER TEMPLATE  (1600x900)  ·  the DEFAULT cover for most videos.
+  A bold headline on a clean background. No diagram, no logos required. Works for any topic:
+  essays, cooking, productivity, product, dev. Retheme with the CSS vars at the top.
+
+  EDIT: --bg / --ink / --accent / --display to fit the topic (see the presets below), and the
+  headline + kicker + footer text. Render at 1600x900 (see references/cover-render.md).
+
+  PRESETS (uncomment one set of vars):
+   editorial/light (default) : --bg:#f1efe7 --ink:#1b1a17 --mut:#6b675c --accent:#6c4cf0
+   warm/lifestyle            : --bg:#f7f1e8 --ink:#25201a --mut:#7a705f --accent:#c2693f
+   dark/technical            : --bg:#0a0a0c --ink:#f2f2f4 --mut:#8a8a94 --accent:#8b6cff
+-->
+<html lang="en"><head><meta charset="utf-8"><style>
+  /* Departure Mono is bundled for dev/technical topics; for other topics use a system font
+     (default below) or drop in a warmer serif/grotesk via its own @font-face. */
+  @font-face{font-family:departureMono;src:url('./departure.woff2') format('woff2');font-display:block}
+  :root{
+    --bg:#f1efe7; --ink:#1b1a17; --mut:#6b675c; --accent:#6c4cf0;
+    --display:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Segoe UI",Arial,sans-serif;
+    /* dev/technical? set: --display:departureMono,monospace;  and use the dark preset above */
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1600px;height:900px}
+  body{background:var(--bg);color:var(--ink);overflow:hidden;position:relative}
+  .frame{position:absolute;inset:0;padding:92px 96px;display:flex;flex-direction:column;justify-content:space-between}
+  .kicker{font-family:var(--mono);font-size:24px;color:var(--mut);letter-spacing:.02em}
+  .mid{max-width:1240px}
+  h1{font-family:var(--display);font-weight:800;font-size:96px;line-height:1.08;letter-spacing:-.02em}
+  h1 .a{color:var(--accent)}          /* accent one word or the number */
+  .deck{font-family:var(--mono);font-size:28px;color:var(--mut);margin-top:30px;line-height:1.5}
+  .foot{font-family:var(--mono);font-size:22px;color:var(--mut);border-top:1px solid color-mix(in srgb, var(--ink) 14%, transparent);padding-top:22px;display:flex;justify-content:space-between}
+  /* optional hero-photo layer (cooking/product/how-to covers): see the commented block in <body> */
+  .hero{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .scrim{position:absolute;inset:0;background:linear-gradient(90deg, color-mix(in srgb, var(--bg) 92%, transparent) 38%, color-mix(in srgb, var(--bg) 40%, transparent))}
+  .frame{z-index:1}
+</style></head>
+<body>
+<!-- HERO PHOTO (optional): uncomment for a photo-led cover (one hero photo / product frame).
+     Put the image next to cover.html; keep the scrim so the headline stays legible over it.
+<img class="hero" src="./hero.jpg" alt="">
+<div class="scrim"></div>
+-->
+<div class="frame">
+  <div class="kicker">a build log · self-hosting</div>   <!-- EDIT or delete -->
+  <div class="mid">
+    <h1>Your Headline, With One<br><span class="a">Accent Word</span> Or Number</h1>
+    <div class="deck">one muted supporting line, optional</div>   <!-- EDIT or delete -->
+  </div>
+  <div class="foot"><span>creator / channel</span><span>topic · detail</span></div>  <!-- EDIT or delete -->
+</div></body></html>

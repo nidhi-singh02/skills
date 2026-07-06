@@ -1,0 +1,17 @@
+[fixture transcript for eval 3: 20-minute how-to, planning a week in Notion; screenshots: board.jpg, template.jpg, review.jpg; no repo]
+
+okay, this is the exact system I use to plan my week in Notion. takes me about 25 minutes every Sunday and it's survived two years, which for me is a record.
+
+the setup is one board with four columns: this week, today, waiting, done. that's it. you can see the board here. no priority tags, no effort estimates, none of that, I'll explain why in a minute.
+
+every Sunday I do three passes. first pass, brain dump: everything on my mind goes into this week as a card, badly worded is fine. second pass, I cut the list in half. literally half. if I wrote twelve cards, six survive. the cut cards go to a backlog page I look at monthly.
+
+the part everyone gets wrong is the second pass. people skip the cut because everything feels important on Sunday. then Wednesday hits, the board is a wall of guilt, and they stop opening it. the cut IS the system. an honest six-item week beats an aspirational twelve-item week every single time.
+
+third pass, I drag tomorrow's two or three cards into today. never more than three. here's the weekly template I duplicate, it has the three passes as checkboxes so I don't skip the cut when I'm tired.
+
+during the week the only rule is: a card moves to waiting the moment it's blocked on someone else, with their name on the card. that one habit killed most of my follow-up anxiety.
+
+Friday I spend five minutes on the review page, this screenshot: what shipped, what rolled over twice. anything that rolls over twice gets deleted or rewritten smaller, because a card that rolls over twice is lying about its size.
+
+that's the whole thing. one board, three passes, cut half, max three a day. try just the Sunday cut this week even without the rest, that's the piece that changed it for me.

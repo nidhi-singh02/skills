@@ -1,0 +1,15 @@
+[fixture transcript for eval 2: 15-minute talking-head essay, no screenshots, no repo]
+
+so I've watched maybe fifty AI agent demos this year and I want to say the quiet part out loud: most of them are misleading. not fake exactly, but staged in a way that hides everything that matters.
+
+here's the pattern. the demo picks a task the builder already knows the agent can do. the prompt has been rehearsed twenty times. the run you see is the one out of ten that worked. and the video cuts before anyone checks whether the output was actually correct.
+
+why it matters: people are making purchase and hiring decisions off these clips. I talked to two founders last month who budgeted a quarter around an agent workflow they'd only ever seen in a demo. both projects stalled inside three weeks.
+
+the strongest case I can make is the retry problem. in every real deployment I've been close to, the agent fails on maybe a third of runs and someone quietly retries or patches by hand. the demo shows the win, the deployment inherits the retries. one team I advised measured it: 68 percent task success on the exact workflow the vendor demo showed at what looked like 100.
+
+the honest counter-argument: demos have always been staged, in every industry. a car ad isn't a crash test. that's fair. the difference is that with agents the gap between the staged run and the median run is enormous and invisible, and there's no equivalent of a crash-test rating yet.
+
+what I actually want people to do. if you're evaluating an agent, ask for the failure rate, not a demo. run it five times on your own task, not theirs. and if you're building one, publish your median run. the first vendor that shows their worst run on stage gets my money.
+
+that's the whole argument. demos measure charisma, deployments measure reliability, and we keep buying charisma.

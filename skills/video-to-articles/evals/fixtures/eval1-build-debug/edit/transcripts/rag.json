@@ -1,0 +1,24 @@
+{
+  "video": "local RAG pipeline build-along (fixture transcript for eval 1)",
+  "duration_sec": 1500,
+  "segments": [
+    {"start": 0, "end": 14, "text": "okay so today I'm setting up a RAG pipeline that runs completely on my laptop. no API keys, no cloud, nothing leaves the machine."},
+    {"start": 14, "end": 31, "text": "quick why: I keep pasting my own notes into chat windows and that's dumb. I have about 4000 markdown notes and I want to ask questions against them locally."},
+    {"start": 31, "end": 52, "text": "the stack is simple on paper. an embedding model running locally, a little vector store, and a 7B model for the answers. three pieces. you can see the diagram I sketched here."},
+    {"start": 52, "end": 70, "text": "first step, ingest. I'm pointing the loader at my notes folder... okay, 3,847 files picked up. splitting them into chunks now."},
+    {"start": 70, "end": 92, "text": "the default chunk size in the example config is 2000 characters. I just left it. remember that, it matters later."},
+    {"start": 92, "end": 110, "text": "embedding run took about six minutes on this machine. index built. now the fun part, asking it something."},
+    {"start": 110, "end": 133, "text": "'what did I decide about the pricing experiment in march' ... and the answer is garbage. it's quoting a note from a completely different project."},
+    {"start": 133, "end": 151, "text": "let me try an easier one. 'what laptop do I use'... also wrong. it pulled half a sentence from a packing list. something is off."},
+    {"start": 151, "end": 175, "text": "so at this point I assumed the model was the problem and swapped the 7B for a bigger one. twenty minutes of downloading. same garbage answers. that was a dead end, don't do that."},
+    {"start": 175, "end": 198, "text": "then I printed the actual retrieved chunks, and there it is. every chunk is a wall of text that starts mid-sentence and ends mid-sentence. the retrieval isn't finding meaning, it's finding word soup."},
+    {"start": 198, "end": 223, "text": "the wall was the chunk size the whole time. 2000 characters on short markdown notes means every chunk smashes three or four unrelated notes together, so every embedding is an average of unrelated topics and nothing matches anything."},
+    {"start": 223, "end": 247, "text": "the fix is two lines in the config. chunk size down to 500 characters, chunk overlap 50, and split on the markdown headings first so a chunk never crosses two notes. re-ran the ingest."},
+    {"start": 247, "end": 268, "text": "same question again. 'what did I decide about the pricing experiment in march'... and it nails it. exact note, exact decision, cites the right file."},
+    {"start": 268, "end": 288, "text": "I tested ten questions after the fix, eight were spot on and two were close but pulled a neighbouring note. that's honestly good enough for what I need."},
+    {"start": 288, "end": 310, "text": "total damage: about an hour lost to the chunk-size rabbit hole, including that pointless model swap. the actual fix took five minutes once I looked at the retrieved chunks instead of the answers."},
+    {"start": 310, "end": 330, "text": "the lesson I'd tattoo on my arm: when RAG answers are bad, print the retrieved chunks first. the retrieval is broken way more often than the model."},
+    {"start": 330, "end": 348, "text": "everything, the config, the ingest script, the exact settings, is in my repo, github.com/example/rag-local-setup. take it and skip the hour I lost."},
+    {"start": 348, "end": 360, "text": "next video I'll wire this into my editor so I can query notes without leaving it. see you in that one."}
+  ]
+}

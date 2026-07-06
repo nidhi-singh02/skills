@@ -1,0 +1,10 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code / Playwright render scratch
+.playwright-mcp/
+
+# temp / render artifacts
+*.tmp
+__pycache__/
