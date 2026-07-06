@@ -16,7 +16,7 @@ case "$cmd" in
   serve)
     dir="${1:?usage: render_cover.sh serve <dir> [port]}"
     port="${2:-$port_default}"
-    ( cd "$dir" && python3 -m http.server "$port" >/dev/null 2>&1 & )
+    ( cd "$dir" && python3 -m http.server "$port" --bind 127.0.0.1 >/dev/null 2>&1 & )
     sleep 1
     code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$port/" || true)
     echo "serving $dir on http://localhost:$port (status $code)"

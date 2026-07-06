@@ -16,7 +16,7 @@ base="https://$host"
 
 try() { # url ext
   local url="$1" ext="$2" f="$out.$2"
-  local code; code=$(curl -s -L -o "$f" -w "%{http_code}" "$url" || echo 000)
+  local code; code=$(curl -s -L --connect-timeout 5 --max-time 20 -o "$f" -w "%{http_code}" "$url" || echo 000)
   if [ "$code" = "200" ] && [ -s "$f" ] && [ "$(wc -c < "$f")" -gt 500 ] \
      && ! grep -qi "<html" "$f" 2>/dev/null; then
     echo "saved $f  ($(wc -c < "$f" | tr -d ' ') bytes)  <- $url"
@@ -33,12 +33,17 @@ try "$base/favicon.png"                png
 
 # stage 2: scrape the homepage and auto-try candidates by priority
 name="${host%%.*}"
-cands=$(curl -s -L "$base" | grep -oiE '(src|href)="[^"]*\.(svg|png)"' \
-        | sed -E 's/^(src|href)="//; s/"$//' | sort -u)
+cands=$(curl -s -L --connect-timeout 5 --max-time 20 "$base" | grep -oiE '(src|href)="[^"]*\.(svg|png)"' \
+        | sed -E 's/^(src|href)="//; s/"$//' | sort -u || true)
 for pat in apple-touch-icon android-chrome-512 android-chrome "$name" -logo logo pinned; do
   hit=$(printf '%s\n' "$cands" | grep -i -- "$pat" | head -1 || true)
   [ -n "$hit" ] || continue
-  case "$hit" in http*) url="$hit";; /*) url="$base$hit";; *) url="$base/$hit";; esac
+  case "$hit" in
+    http*) url="$hit";;
+    //*)   url="https:$hit";;          # protocol-relative //cdn.example/logo.png
+    /*)    url="$base$hit";;
+    *)     url="$base/$hit";;
+  esac
   ext="${url##*.}"
   try "$url" "$ext"
 done

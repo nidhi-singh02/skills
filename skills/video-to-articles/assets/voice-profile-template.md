@@ -35,6 +35,9 @@ sentence case?), energy (dry / warm / hype), and the one or two things that make
 - **DON'T:** hype words, clichés, or anything off-brand. (The skill also strips generic AI tells.)
 
 ## Learned (machine-appended)
-The skill appends one dated line here each time you correct a draft, e.g.
-`- 2026-07-05: rejected "game-changer"; prefers plain "useful"`. It reads these back before
-writing your next piece, so corrections stick. Prune or edit freely; it's your file.
+The skill appends one dated line here from two sources, and reads them back before your next piece
+so both kinds of lesson stick. Prune or edit freely; it's your file.
+- Draft corrections (what you changed or rejected), e.g.
+  `- 2026-07-05: rejected "game-changer"; prefers plain "useful"`.
+- Post-launch retro findings (what the audience rewarded; see `references/retro.md`), e.g.
+  `- 2026-07-05 · x · build/debug · time-saved hook · bookmarks 4x likes: keep the in-body save cue`.

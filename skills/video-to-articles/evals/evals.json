@@ -19,7 +19,7 @@
         "a story-spine file was written before the article",
         "3-4 title/hook candidates were presented with a recommendation before the full draft",
         "the debugging wall (chunk size) is the longest article section",
-        "an x-article.html twin exists whose visible text matches the md payload"
+        "an x-article.html twin exists whose visible text matches the md payload (the launch post and Reply A/B are pasted into X's native composer separately and are intentionally NOT in the twin, which carries only THE ARTICLE body; parity is scoped to that section)"
       ]
     },
     {

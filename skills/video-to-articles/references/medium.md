@@ -47,3 +47,7 @@ zone. Render a **1600x840** cover (that ratio needs almost no crop for cards/Twi
 the headline and hero element **centered**, and keep it **under 500KB**. Use
 `assets/cover-medium-template.html` (the centered variant of the cover template) and the same
 render/verify flow in `cover-render.md`.
+
+Most Medium covers should be **text-only** (per SKILL.md). For a text-only 1600x840 cover, use
+`assets/cover-text-template.html` with its `html,body` height changed from `900px` to `840px` (and
+`browser_resize` 1600×840); reserve `cover-medium-template.html` for a real 3-node story.

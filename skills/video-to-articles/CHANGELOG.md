@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 — 2026-07-06
+- Verifier hardened: em-dash check now strips code/URLs/HTML-comments and catches `word--word`
+  (plus `--allow-em-dash` for creators whose voice profile permits them); launch-post length counts
+  CJK/emoji as X does and detects scheme-less links; LinkedIn plain-text check flags md links and
+  italics with a balanced-`**` guard; X twin-parity is scoped to THE ARTICLE body (launch post +
+  replies are pasted separately and intentionally not in the twin); CJK/Thai wrap heuristic; robust
+  read errors.
+- Content: added an interview/conversation/vlog archetype and multi-topic "split into separate runs"
+  guidance; non-English transcript handling; an explicit destination-platform step; a Medium
+  subtitle-vs-SEO-title nuance; a LinkedIn-post-only cover skip; per-platform cover filenames.
+- Cover pipeline: `render_cover.sh`/`fetch_logo.sh` bind to loopback, add curl timeouts and
+  protocol-relative logo handling; `cover-render.md` documents the serve/collect/stop helper and a
+  fresh-copy `sips` flow.
+- Docs: description hardened (summarize/notes exclusion, "blog or post"); a `## Files` manifest; the
+  em-dash rule reframed so the profile exception is primary; an execCommand fallback note.
+
 ## 1.1.0 — 2026-07-05
 - Copy-paste fidelity: one paragraph per line everywhere; paste-ready `.html` twins for X and
   Medium with per-section Copy buttons (headings/bold/links paste formatted; 📷 placeholder blocks).

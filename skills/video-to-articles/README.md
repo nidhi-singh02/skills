@@ -26,7 +26,9 @@ carousel is a separate skill.
 Every deliverable keeps one paragraph per line, so copying never leaves stray mid-sentence line
 breaks to repair. `scripts/verify_article.py` enforces this plus the other invariants.
 
-The `SKILL.md` ends with a worked example (a dev build-along). Drop your own runs in `examples/`.
+`SKILL.md` closes with one illustrative example (a dev build-along) showing the *shape* only.
+`examples/` starts empty on purpose; the skill offers to save your real runs there over time (see
+`examples/README.md`).
 
 ## Requirements
 
@@ -36,6 +38,8 @@ The `SKILL.md` ends with a worked example (a dev build-along). Drop your own run
   Optional: without it, the skill still writes everything and hands you a finished `cover.html` to
   screenshot yourself.
 - **Python 3** for `scripts/verify_article.py` (stdlib only).
+- **`curl`** for the cover-render server health-check (`scripts/render_cover.sh`, a non-fatal
+  status probe on every X/Medium cover) and for `scripts/fetch_logo.sh` (diagram/brand-logo covers).
 
 ## Install
 
@@ -113,4 +117,4 @@ Cover font: **Departure Mono** by Helena Zhang & Tobias Fried (MIT). https://dep
 
 ## License
 
-MIT. See `LICENSE`. The bundled font keeps its own license in `assets/DepartureMono-LICENSE.txt`.
+MIT. See `LICENSE`. The bundled font keeps its own MIT license in `assets/DepartureMono-LICENSE.txt`.

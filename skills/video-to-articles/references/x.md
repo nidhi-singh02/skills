@@ -25,6 +25,10 @@ Medium and LinkedIn packs use the same scaffolding (see `medium.md` / `linkedin.
 ## Platform facts (as of 2026-07, re-verify if older than ~6 months)
 - External links in a post cost roughly 30-90% reach; a published X Article attaches to a post as a
   native card with no link penalty.
+- **X Articles require X Premium+** (publishing long-form Articles is a paid feature). Confirm the
+  creator has it in Step 0/1. If they don't, fall back: post the article body as a long-form post
+  (or a short thread) instead of an Article; the launch-post-then-link-in-reply structure below is
+  unchanged, but the launch post links to the long-form post rather than attaching an Article card.
 - Replies are worth ~27-150x a like; author replies that get replies are the strongest signal.
   Bookmarks are heavily weighted, so save-worthy content wins.
 - Long-form dwell time boosts distribution; hashtags are near-useless (0-1 max).
