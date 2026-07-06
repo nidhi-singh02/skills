@@ -16,6 +16,7 @@ judgment job done in the conversation (see SKILL.md) — this script just execut
 Usage:
     python build.py spec.json
     python build.py spec.json --preview     # faster, lower CRF
+    python build.py spec.json --check       # verify a rendered output vs the spec
 
 Loudnorm uses video-use's helper if present (auto-resolved; inherits upstream fixes),
 otherwise a built-in 2-pass loudnorm — so this runs standalone with no external repo.
@@ -69,6 +70,18 @@ def sh(cmd, cwd=None):
                    stderr=subprocess.PIPE, cwd=cwd)
 
 
+def atempo_chain(spd: float) -> str:
+    """ffmpeg's atempo accepts 0.5..2.0 per instance. Chain factors (whose product == spd)
+    so a `speed` override outside that window still works instead of hard-failing at extract."""
+    factors, s = [], float(spd)
+    while s > 2.0:
+        factors.append(2.0); s /= 2.0
+    while s < 0.5:
+        factors.append(0.5); s /= 0.5
+    factors.append(s)
+    return ",".join(f"atempo={f:g}" for f in factors)
+
+
 def dur(p: Path) -> float:
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
                           "format=duration", "-of", "default=nk=1:nw=1", str(p)],
@@ -103,6 +116,20 @@ def probe_wh(p):
 LUFS_I, LUFS_TP, LUFS_LRA = -14.0, -1.0, 11.0
 
 
+def measure_loudness(p: Path):
+    """Analysis-pass loudnorm; returns ffmpeg's measurement dict (input_i, input_tp,
+    input_lra, input_thresh, target_offset) or None if it can't be parsed. Used both to
+    drive the 2-pass correction and to verify an output in --check."""
+    r = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", str(p),
+         "-af", f"loudnorm=I={LUFS_I}:TP={LUFS_TP}:LRA={LUFS_LRA}:print_format=json",
+         "-f", "null", "-"], capture_output=True, text=True)
+    try:
+        return json.loads(r.stderr[r.stderr.rindex("{"):r.stderr.rindex("}") + 1])
+    except Exception:
+        return None
+
+
 def resolve_helpers(explicit):
     """Locate video-use's helpers dir — OPTIONAL, only its 2-pass loudnorm is used.
 
@@ -132,17 +159,12 @@ def _local_loudnorm(inp: Path, outp: Path, preview=False):
               "-movflags", "+faststart", str(outp)]
     base = f"loudnorm=I={LUFS_I}:TP={LUFS_TP}:LRA={LUFS_LRA}"
     if not preview:
-        m = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-nostats", "-i", str(inp),
-             "-af", base + ":print_format=json", "-f", "null", "-"],
-            capture_output=True, text=True)
-        try:
-            d = json.loads(m.stderr[m.stderr.rindex("{"):m.stderr.rindex("}") + 1])
+        d = measure_loudness(inp)
+        if d:
             base += (f":measured_I={d['input_i']}:measured_TP={d['input_tp']}"
                      f":measured_LRA={d['input_lra']}:measured_thresh={d['input_thresh']}"
                      f":offset={d['target_offset']}:linear=true")
-        except Exception:
-            pass  # measurement unreadable — one-pass is the safe degrade
+        # measurement unreadable -> base stays one-pass, the safe degrade
     sh(["ffmpeg", "-y", "-i", str(inp), "-c:v", "copy", "-af", base] + common)
     return True
 
@@ -167,15 +189,16 @@ def extract(seg, i, cfg, clips, preview):
     odur = float(seg["end"]) - float(seg["start"])
     spd = cfg["speed"]
     sdur = odur / spd
-    fo = max(0.0, sdur - 0.03)
+    fd = min(0.03, max(0.0, sdur / 2.0))   # 30ms edge fades, shrunk so sub-60ms clips
+    fo = max(0.0, sdur - fd)               # don't get overlapping in/out fades
     crf = "20" if preview else "16"
     preset = "medium" if preview else "fast"
     out = clips / f"seg_{i}.mp4"
     W, H, fps = cfg["width"], cfg["height"], cfg["fps"]
 
     den = (cfg["denoise"] + ",") if cfg["denoise"] else ""
-    aud = (f"{den}atempo={spd},"
-           f"afade=t=in:st=0:d=0.03,afade=t=out:st={fo:.3f}:d=0.03")
+    aud = (f"{den}{atempo_chain(spd)},"
+           f"afade=t=in:st=0:d={fd:.3f},afade=t=out:st={fo:.3f}:d={fd:.3f}")
     tail = ["-c:v", "libx264", "-preset", preset, "-crf", crf,
             "-pix_fmt", "yuv420p", "-r", str(fps),
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
@@ -364,10 +387,57 @@ def make_title(cfg, fonts_dir, out: Path):
     print(f"  title.png ({len(lines)} line(s))")
 
 
+# ---- self-eval gate ---------------------------------------------------------
+def run_checks(cfg, segs, blocks, edit, preview):
+    """Machine-verifiable gate over an already-rendered output. Duration and loudness are
+    hard PASS/FAIL — they catch silent breakage a log won't show (a skipped loudnorm, a
+    `-ss/-t` speed regression). Caption count is INFO, not a gate: no-speech montages
+    legitimately carry none. Returns True iff the hard checks pass; CLI exits non-zero."""
+    XF = cfg["xfade"]; spd = cfg["speed"]; tag = f"_{cfg['version']}"
+    out = edit / (f"preview{tag}.mp4" if preview else f"final{tag}.mp4")
+    ass = edit / "master.ass"
+    passed = True
+
+    def check(name, cond, detail=""):
+        nonlocal passed
+        passed = passed and cond
+        print(f"  [{'PASS' if cond else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
+
+    print(f"checking {out.name}")
+    if not out.exists():
+        print(f"  [FAIL] output missing — {out} (render before --check)")
+        return False
+
+    got = dur(out)
+    exp = sum((float(s['end']) - float(s['start'])) / spd for s in segs) - (len(blocks) - 1) * XF
+    check("duration matches spec", abs(got - exp) <= 0.3,
+          f"got {got:.2f}s vs expected {exp:.2f}s (speed {spd}x, {len(blocks) - 1} xfade(s))")
+
+    if cfg["loudnorm"]:
+        d = measure_loudness(out)
+        li = float(d["input_i"]) if d else None
+        tp = float(d["input_tp"]) if d else None
+        check("integrated loudness ~ -14 LUFS", li is not None and -15.0 <= li <= -13.0,
+              f"measured {li} LUFS")
+        check("true-peak <= -1 dBTP (small slack)", tp is not None and tp <= -0.5,
+              f"measured {tp} dBTP")
+
+    ndlg = sum(1 for ln in ass.read_text().splitlines()
+               if ln.startswith("Dialogue:")) if ass.exists() else 0
+    print(f"  [INFO] captions: {ndlg} cue(s)" +
+          ("" if ndlg else " — none (fine for a no-speech montage; verify if you expected some)"))
+
+    print("  " + ("ALL CHECKS PASSED" if passed else "CHECKS FAILED"))
+    return passed
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("spec", type=Path)
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--check", action="store_true",
+                    help="verify an already-rendered output against the spec "
+                         "(duration, -14 LUFS loudness; caption count reported) and exit")
     args = ap.parse_args()
 
     spec = json.loads(args.spec.read_text())
@@ -377,7 +447,6 @@ def main():
     skill_root = Path(__file__).resolve().parent.parent
     fonts_dir = Path(cfg["fonts_dir"]).resolve() if cfg["fonts_dir"] \
         else skill_root / "assets" / "fonts"
-    clips = edit / "clips"; clips.mkdir(parents=True, exist_ok=True)
 
     segs = spec["segments"]
     for i, s in enumerate(segs):
@@ -385,6 +454,10 @@ def main():
     blocks = spec.get("blocks") or [[i] for i in range(len(segs))]
     XF = cfg["xfade"]; preview = args.preview
 
+    if args.check:
+        sys.exit(0 if run_checks(cfg, segs, blocks, edit, preview) else 1)
+
+    clips = edit / "clips"; clips.mkdir(parents=True, exist_ok=True)
     print("1) extract segments")
     paths = [extract(s, i, cfg, clips, preview) for i, s in enumerate(segs)]
     m = [dur(p) for p in paths]

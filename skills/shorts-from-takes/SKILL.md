@@ -2,16 +2,16 @@
 name: shorts-from-takes
 description: >-
   Assemble several raw clips — multiple takes, separate shots, or existing reels — into ONE
-  finished, on-brand vertical Short (1080x1920), PLUS ready-to-post YouTube / Instagram Reels /
-  X metadata. Use this whenever someone hands over a batch of videos/clips and wants them cut
-  down, stitched, and combined into a single short-form video: it selects and orders the best
-  material, fits every clip to vertical (portrait or wide), burns word-by-word captions, adds a
-  title card and optional speed-up / relight, and normalizes the audio. Works for ANY content —
-  talking-head, screen recordings, b-roll, product, travel, gameplay, vlog. Trigger on "make a
-  short/reel from these clips", "combine/stitch/concatenate these videos into one short", "cut a
-  vertical video from my takes", "edit these into a Short/Reel/TikTok", or any folder of clips to
-  turn into a posted short-form video. Opinionated house-style layer ON TOP OF the `video-use`
-  skill — use video-use for the engine (transcribe, timeline, render helpers) and this for the recipe.
+  finished, on-brand vertical Short (1080x1920), PLUS ready-to-post YouTube / Instagram /
+  TikTok / X metadata. Use this whenever someone hands over a batch of clips and wants them
+  stitched into a single short-form video: it selects and orders the best material, fits each
+  clip to vertical, burns word-by-word captions, adds a title card, and normalizes audio.
+  Works for ANY content — talking-head, screen recordings, b-roll, montage. Trigger on "make a
+  short/reel from these clips", "combine/stitch these videos into one short", "cut a vertical
+  video from my takes", "edit these into a Short/Reel/TikTok", or any folder of clips to post
+  as a Short. Opinionated layer ON TOP OF `video-use` — use video-use for a freeform
+  single-video edit; cede to `video-to-articles` for a written post/article and
+  `linkedin-carousel` for a slide/PDF carousel.
 ---
 
 # Shorts From Takes
@@ -86,8 +86,8 @@ how warm, font size — are judgment calls made by looking at the footage.
 - Choose the best clip/take per beat and order them so they flow. Drill into specific moments
   with `video-use`'s `timeline_view.py` (filmstrip+waveform) to find clean cut points and to
   spot look-aways/awkward pauses to trim.
-- For spoken clips, snap cuts to word boundaries from the transcript; pad edges 30–200ms;
-  prefer silences.
+- For spoken clips, snap cuts to word boundaries and pad edges — the exact rule (and why
+  cutting inside a word fails) is `references/render-notes.md` hard rule 8.
 - Confirm the plain-English plan (clip order, trims, title, any name corrections) with the
   user before rendering.
 
@@ -100,25 +100,29 @@ how warm, font size — are judgment calls made by looking at the footage.
 - See `references/render-notes.md` for the spec schema, the production-correctness rules,
   and the gotchas that cause silent failures (read it before changing the render).
 
-### 4. Self-eval before showing the user (mandatory)
-On the **rendered output**, sample frames at every cut (±1.5s), the title, first/last 2s,
-and a few mid-points. Check: no visual jump/flash at cuts, no audio pop (waveform), captions
-not hidden + readable + in the safe zone, title/grade correct, duration matches the spec,
-captions start when intended, names corrected. Fix → re-render → re-check (cap 3 passes).
-Only show the user once it passes. Bump `version` for each iteration so they compare.
+### 4. Self-eval before showing the user
+Render failures here are *silent* — a mis-ordered filter, a hidden caption, or a skipped
+loudnorm looks fine in the ffmpeg log and only shows on an actual frame or waveform. So grade
+the rendered file, not the plan, before the user ever sees it.
+- Run the automated gate first: `python scripts/build.py <spec.json> --check` asserts output
+  duration and −14 LUFS loudness against the spec (and reports the caption-cue count).
+- Then eyeball what a script can't, per the Self-eval recipe in `references/render-notes.md`
+  (frames at each cut, title, first/last 2s; captions readable + in safe zone; grade
+  consistent; names corrected). Fix → re-render → re-check, cap 3 passes. Bump `version` each
+  iteration so the user can compare.
 
-### 5. Posting metadata (when asked, or offer it)
+### 5. Posting metadata (optional — when asked, or offer it)
 Write platform-tuned metadata to `<edit>/social_metadata.md` per
-`references/social-metadata.md` — YouTube Shorts, Instagram Reels, X native video, each to
-that platform's CURRENT algorithm. Research current trends first (web search); the
-reference encodes the durable rules but trends move.
+`references/social-metadata.md` — YouTube Shorts, Instagram Reels, X native video, and TikTok
+(the "when asked" fourth platform), each to that platform's CURRENT algorithm. Research current
+trends first (web search); the reference encodes the durable rules but trends move.
 
 ## Files
-- `scripts/build.py` — the render engine (reads a spec.json). Self-contained: borrows
-  video-use's loudnorm if present, else uses a built-in 2-pass.
+- `scripts/build.py` — the render engine (reads a spec.json; `--preview` and `--check` modes).
+  Self-contained: borrows video-use's loudnorm if present, else uses a built-in 2-pass.
 - `scripts/spec.example.json` — worked example: several clips assembled into one Short (copy + edit paths).
 - `references/render-notes.md` — spec schema + hard rules + gotchas. Read before editing render.
-- `references/social-metadata.md` — the 3-platform metadata playbook + paste-ready templates.
+- `references/social-metadata.md` — the 4-platform metadata playbook + paste-ready templates.
 - `references/transcript-schema.md` — the transcript JSON captions read (bring your own).
 - `requirements.txt` — Python deps (`pillow`); ffmpeg/ffprobe are system tools.
 - `assets/fonts/` — Anton (caption/title), Montserrat (fallback); SIL OFL, licenses in `assets/font-licenses/`.

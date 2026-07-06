@@ -42,14 +42,16 @@ Common overrides (else house-style defaults in `build.py`):
 4. **Per-segment extract → lossless `-c copy` concat for blocks**, then ONE final encode
    for xfade+title+captions. Don't single-pass the whole thing from sources — you lose the
    clean block boundaries and re-encode more than once.
-5. **30ms audio fades at every segment edge** (`afade` in/out d=0.03). Prevents pops at the
+5. **≤30ms audio fades at every segment edge** (`afade` in/out, d=0.03, auto-shrunk toward
+   half-length for sub-60ms clips so the in/out fades never overlap). Prevents pops at the
    hard cuts inside a block. Block joins use `acrossfade` (the xfade handles the seam).
-6. **xfade offset = (length of accumulated video so far) − xfade_dur.** `build.py` tracks
-   this iteratively (`acc`); the second input's frame-0 appears at `offset`. Audio uses a
-   matching `acrossfade` so A/V stay in sync (xfade shortens total by `xfade` per join).
-7. **Caption output times must account for speed AND xfade overlap.** Per-segment offset =
-   block_start_offset + cumulative sped seg durations; word time → `(src - seg_start)/speed
-   + offset`. `build.py` computes this; don't hand-edit timings.
+6. **A/V sync at block joins: the video `xfade` and the audio `acrossfade` MUST share the
+   same duration.** Both shorten the total by `xfade` per join, so they stay locked only if
+   equal. `build.py` owns the offset accumulator (`acc` in `main()`) — don't recompute it by
+   hand; a manual offset desyncs audio from video after the first join.
+7. **Caption times account for BOTH speed and xfade overlap.** `build.py` computes each cue's
+   output time from the transcript; don't hand-edit timings — any manual offset drifts the
+   moment `speed` or a block boundary changes.
 8. **Never cut inside a word.** Snap to word boundaries from the transcript; pad
    30–200ms. Prefer silences ≥400ms as cut targets. (No transcript = no captions for that
    clip; the video still renders — fine for montages / no-speech footage.)
@@ -72,15 +74,24 @@ Common overrides (else house-style defaults in `build.py`):
 - House `grade_filter`: `colortemperature=temperature=5200:pl=1` (warmer) +
   `curves=master='0/0.05 0.25/0.30 0.75/0.71 1/0.93'` (lift shadows so they aren't harsh,
   pull highlights so direct light isn't blown) + slight saturation. Tune `temperature`
-  lower = warmer, and the curve endpoints for more/less shadow lift. ALWAYS test on a real
-  face frame before committing — skin tone is unforgiving.
+  lower = warmer, and the curve endpoints for more/less shadow lift. Test the grade on a
+  real face frame before committing — skin tone is unforgiving and the numbers lie until
+  you see a face.
 
 ## Audio
-- Source from good phones is often near-silent in gaps (−90 dBFS+). Keep denoise GENTLE
-  (`highpass=f=70,afftdn=nr=8`) — aggressive denoise/arnndn makes the voice watery for no
-  gain. Verify speech RMS is unchanged before/after. Then loudnorm to −14 LUFS / −1 dBTP.
+- Source from good phones is often near-silent in gaps (−90 dBFS+). Keep denoise gentle —
+  the `build.py` default is `highpass=f=70,afftdn=nr=8:nf=-50` (the `nf` sets the noise
+  floor). Aggressive denoise/arnndn makes the voice watery for no gain; if you tighten it,
+  listen to the speech before/after (a manual check — the script doesn't measure RMS).
+- Then loudnorm to −14 LUFS / −1 dBTP, two-pass (measure, then correct): video-use's helper
+  if present, else the built-in in `build.py`. Two-pass lands ON target and holds true-peak
+  under −1 dBTP, which single-pass can miss on a late loud transient (some players clip).
 
 ## Self-eval recipe (use video-use's timeline_view on the OUTPUT, not the sources)
-At each cut ±1.5s: look for visual jump/flash and audio-pop spikes in the waveform. Sample
-the title, first/last 2s, mids. Verify captions visible + safe-zone + readable, grade
-consistent, duration ≈ spec, captions start when intended, names corrected. Cap 3 fix loops.
+Run `python scripts/build.py <spec.json> --check` first — it asserts output duration and
+−14 LUFS loudness (±1 LU; true-peak ≤ −0.5 dBTP, small slack over the −1 target) and reports
+the caption-cue count, so a silently skipped loudnorm or a `-ss/-t` duration regression fails
+loudly. Then eyeball what a script can't: at each cut ±1.5s look for visual jump/flash and
+audio-pop spikes in the waveform; sample the title, first/last 2s, mids; verify captions
+visible + safe-zone + readable, grade consistent, captions start when intended, names
+corrected. Cap 3 fix loops.
