@@ -184,6 +184,29 @@ def get_loudnorm(helpers_dir):
     return _local_loudnorm
 
 
+# ---- HDR -> SDR tone mapping (HLG / PQ sources) -----------------------------
+# iPhone selfie takes default to HLG HDR. If we only drop bit depth without
+# tone-mapping, the 8-bit output still carries HLG/PQ transfer metadata and social
+# re-encodes read it as HDR -> oversaturated / blown out. Detect via color_transfer
+# and prepend a zscale+tonemap chain so the output is clean Rec.709 SDR.
+HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10) and HLG
+TONEMAP_CHAIN = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+                 "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+
+
+def is_hdr_source(video) -> bool:
+    """True if the source uses a PQ or HLG transfer function (needs tone-mapping)."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=color_transfer",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True)
+        return out.stdout.strip() in HDR_TRANSFERS
+    except subprocess.CalledProcessError:
+        return False
+
+
 # ---- per-segment extract ----------------------------------------------------
 def extract(seg, i, cfg, clips, preview):
     odur = float(seg["end"]) - float(seg["start"])
@@ -239,10 +262,13 @@ def extract(seg, i, cfg, clips, preview):
     gf = cfg["grade_filter"] if g is True else (g if isinstance(g, str) and g.strip() else "")
     grade = ("," + gf) if gf else ""
 
+    # HDR (HLG/PQ, e.g. iPhone) -> tone-map to Rec.709 SDR first, else colours blow out.
+    tm = (TONEMAP_CHAIN + ",") if is_hdr_source(seg["src"]) else ""
+
     fit = (seg.get("fit") or "").lower() or ("blur" if orient == "landscape" else "cover")
     if fit == "blur":
         sigma = cfg.get("blur_sigma", cfg.get("laptop_blur_sigma", 18))
-        fc = (f"[0:v]split=2[bg][fg];"
+        fc = (f"[0:v]{tm}split=2[bg][fg];"
               f"[bg]{bgcropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
               f"crop={W}:{H},gblur=sigma={sigma}[bg2];"
               f"[fg]{cropf}scale={W}:-2[fg2];"
@@ -250,7 +276,7 @@ def extract(seg, i, cfg, clips, preview):
               f"setpts=PTS/{spd},fps={fps}[v];[0:a]{aud}[a]")
         cmd = head + ["-filter_complex", fc, "-map", "[v]", "-map", "[a]"] + tail
     else:  # cover — scale to fill then center-crop; works for any source aspect ratio
-        vf = (f"{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
+        vf = (f"{tm}{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
               f"crop={W}:{H},setsar=1{grade},setpts=PTS/{spd},fps={fps}")
         cmd = head + ["-vf", vf, "-af", aud] + tail
     kn = f"/{seg['kind']}" if seg.get("kind") else " auto"
@@ -261,7 +287,7 @@ def extract(seg, i, cfg, clips, preview):
 
 def concat_copy(parts, out: Path, edit: Path):
     lst = edit / f"_cc_{out.stem}.txt"
-    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts))
+    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts), encoding="utf-8")
     sh(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
         "-c", "copy", "-movflags", "+faststart", str(out)])
     lst.unlink(missing_ok=True)
@@ -307,8 +333,12 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
         if not tpath.exists():
             print(f"  ! no transcript for seg{i} ({tpath.name}) — skipping its captions")
             continue
-        t = json.loads(tpath.read_text())
+        t = json.loads(tpath.read_text(encoding="utf-8"))
         s0, e0, off = float(seg["start"]), float(seg["end"]), offsets[i]
+        # Clamp cues to this segment's output window: whisper stretches the last word's
+        # end to the boundary and the +0.12 hang below would push the final cue past a
+        # hard cut, overlapping the next segment's first caption (garbled double-text).
+        seg_end_out = off + (e0 - s0) / spd
         words = [w for w in t.get("words", [])
                  if w.get("type") == "word" and w.get("start") is not None
                  and w.get("end") is not None and w["end"] > s0 and w["start"] < e0
@@ -340,11 +370,13 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
                 txt = name_fix.get(txt, txt)
                 parts.append(f"{{\\kf{int(round(d*100))}}}{txt} ")
                 cursor = we
-            le = cursor + 0.12
+            le = min(cursor + 0.12, seg_end_out - 0.02)
+            if le <= ls:
+                continue
             dlg.append((ls, le, f"Dialogue: 0,{_ass_ts(ls)},{_ass_ts(le)},"
                                 f"Pop,,0,0,0,,{pop}{''.join(parts).strip()}"))
     dlg.sort()
-    out.write_text(header + "\n".join(d[2] for d in dlg) + "\n")
+    out.write_text(header + "\n".join(d[2] for d in dlg) + "\n", encoding="utf-8")
     print(f"  master.ass: {len(dlg)} cues")
 
 
