@@ -38,7 +38,8 @@ crossfade at orientation flips → title overlay → captions applied last → l
 ## Prerequisites
 
 - **`ffmpeg` + `ffprobe`** on your PATH — `brew install ffmpeg` (macOS) or
-  [ffmpeg.org/download](https://ffmpeg.org/download.html).
+  [ffmpeg.org/download](https://ffmpeg.org/download.html). HDR phone footage needs an
+  FFmpeg build with the `zscale` filter; SDR footage renders with a normal build.
 - **Python 3 + `pillow`.** Easiest is [`uv`](https://docs.astral.sh/uv/) with no setup:
   `uv run --with pillow python scripts/build.py …`. Or `pip install -r requirements.txt`.
 - **Word-level transcripts** — the captions need one transcript JSON per clip. Two paths:

@@ -22,7 +22,7 @@ Loudnorm uses video-use's helper if present (auto-resolved; inherits upstream fi
 otherwise a built-in 2-pass loudnorm — so this runs standalone with no external repo.
 """
 from __future__ import annotations
-import argparse, json, os, re, subprocess, sys
+import argparse, functools, json, os, re, subprocess, sys
 from pathlib import Path
 
 # ---- house-style defaults (overridable per-key in spec.json) ----------------
@@ -63,6 +63,10 @@ DEFAULTS = {
     "video_use_helpers": None,
 }
 PUNCT = set(".,!?;:")
+
+
+class RenderConfigError(RuntimeError):
+    pass
 
 
 def sh(cmd, cwd=None):
@@ -184,6 +188,50 @@ def get_loudnorm(helpers_dir):
     return _local_loudnorm
 
 
+# ---- HDR -> SDR tone mapping (HLG / PQ sources) -----------------------------
+# iPhone selfie takes default to HLG HDR. If we only drop bit depth without
+# tone-mapping, the 8-bit output still carries HLG/PQ transfer metadata and social
+# re-encodes read it as HDR -> oversaturated / blown out. Detect via color_transfer
+# and prepend a zscale+tonemap chain so the output is clean Rec.709 SDR.
+HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10) and HLG
+ZSCALE_TONEMAP_CHAIN = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+                        "tonemap=tonemap=hable:desat=0,"
+                        "zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+
+
+@functools.lru_cache(maxsize=None)
+def ffmpeg_has_filter(name: str) -> bool:
+    try:
+        out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"],
+                             capture_output=True, text=True, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+    return any(len(parts := line.split()) >= 2 and parts[1] == name
+               for line in out.stdout.splitlines())
+
+
+def tonemap_chain() -> str:
+    if ffmpeg_has_filter("zscale"):
+        return ZSCALE_TONEMAP_CHAIN
+    raise RenderConfigError(
+        "HDR source detected, but this ffmpeg build does not include the zscale "
+        "filter required for HDR->SDR tone mapping. Install an ffmpeg build with "
+        "libzimg/zscale support, or convert the source to SDR before rendering.")
+
+
+def is_hdr_source(video) -> bool:
+    """True if the source uses a PQ or HLG transfer function (needs tone-mapping)."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=color_transfer",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+            capture_output=True, text=True, check=True)
+        return out.stdout.strip() in HDR_TRANSFERS
+    except subprocess.CalledProcessError:
+        return False
+
+
 # ---- per-segment extract ----------------------------------------------------
 def extract(seg, i, cfg, clips, preview):
     odur = float(seg["end"]) - float(seg["start"])
@@ -239,10 +287,13 @@ def extract(seg, i, cfg, clips, preview):
     gf = cfg["grade_filter"] if g is True else (g if isinstance(g, str) and g.strip() else "")
     grade = ("," + gf) if gf else ""
 
+    # HDR (HLG/PQ, e.g. iPhone) -> tone-map to Rec.709 SDR first, else colours blow out.
+    tm = (tonemap_chain() + ",") if is_hdr_source(seg["src"]) else ""
+
     fit = (seg.get("fit") or "").lower() or ("blur" if orient == "landscape" else "cover")
     if fit == "blur":
         sigma = cfg.get("blur_sigma", cfg.get("laptop_blur_sigma", 18))
-        fc = (f"[0:v]split=2[bg][fg];"
+        fc = (f"[0:v]{tm}split=2[bg][fg];"
               f"[bg]{bgcropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
               f"crop={W}:{H},gblur=sigma={sigma}[bg2];"
               f"[fg]{cropf}scale={W}:-2[fg2];"
@@ -250,7 +301,7 @@ def extract(seg, i, cfg, clips, preview):
               f"setpts=PTS/{spd},fps={fps}[v];[0:a]{aud}[a]")
         cmd = head + ["-filter_complex", fc, "-map", "[v]", "-map", "[a]"] + tail
     else:  # cover — scale to fill then center-crop; works for any source aspect ratio
-        vf = (f"{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
+        vf = (f"{tm}{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
               f"crop={W}:{H},setsar=1{grade},setpts=PTS/{spd},fps={fps}")
         cmd = head + ["-vf", vf, "-af", aud] + tail
     kn = f"/{seg['kind']}" if seg.get("kind") else " auto"
@@ -261,7 +312,7 @@ def extract(seg, i, cfg, clips, preview):
 
 def concat_copy(parts, out: Path, edit: Path):
     lst = edit / f"_cc_{out.stem}.txt"
-    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts))
+    lst.write_text("".join(f"file '{p.resolve()}'\n" for p in parts), encoding="utf-8")
     sh(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
         "-c", "copy", "-movflags", "+faststart", str(out)])
     lst.unlink(missing_ok=True)
@@ -298,6 +349,19 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
     name_fix = {k.upper(): v for k, v in cfg["name_fix"].items()}
     tdir = edit / cfg["transcripts_dir"]
     dlg = []
+    timeline = []
+    for seg in segs:
+        i = seg["_i"]
+        off = offsets[i]
+        seg_end = off + (float(seg["end"]) - float(seg["start"])) / spd
+        timeline.append((off, i, seg_end))
+    timeline.sort()
+    cue_end_limits = {}
+    for pos, (off, i, seg_end) in enumerate(timeline):
+        later_offsets = [later_off for later_off, _, _ in timeline[pos + 1:]
+                         if later_off > off + 1e-6]
+        cue_end_limits[i] = min(seg_end, later_offsets[0]) if later_offsets else seg_end
+
     for seg in segs:
         i = seg["_i"]
         tpath = Path(seg.get("transcript")) if seg.get("transcript") else \
@@ -307,8 +371,11 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
         if not tpath.exists():
             print(f"  ! no transcript for seg{i} ({tpath.name}) — skipping its captions")
             continue
-        t = json.loads(tpath.read_text())
+        t = json.loads(tpath.read_text(encoding="utf-8"))
         s0, e0, off = float(seg["start"]), float(seg["end"]), offsets[i]
+        # Clamp cues before the next timeline entry. Block crossfades start the incoming
+        # segment early, so the outgoing caption must end before that overlap begins.
+        cue_end_limit = cue_end_limits[i]
         words = [w for w in t.get("words", [])
                  if w.get("type") == "word" and w.get("start") is not None
                  and w.get("end") is not None and w["end"] > s0 and w["start"] < e0
@@ -340,11 +407,13 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
                 txt = name_fix.get(txt, txt)
                 parts.append(f"{{\\kf{int(round(d*100))}}}{txt} ")
                 cursor = we
-            le = cursor + 0.12
+            le = min(cursor + 0.12, cue_end_limit - 0.02)
+            if le <= ls:
+                continue
             dlg.append((ls, le, f"Dialogue: 0,{_ass_ts(ls)},{_ass_ts(le)},"
                                 f"Pop,,0,0,0,,{pop}{''.join(parts).strip()}"))
     dlg.sort()
-    out.write_text(header + "\n".join(d[2] for d in dlg) + "\n")
+    out.write_text(header + "\n".join(d[2] for d in dlg) + "\n", encoding="utf-8")
     print(f"  master.ass: {len(dlg)} cues")
 
 
@@ -422,7 +491,7 @@ def run_checks(cfg, segs, blocks, edit, preview):
         check("true-peak <= -1 dBTP (small slack)", tp is not None and tp <= -0.5,
               f"measured {tp} dBTP")
 
-    ndlg = sum(1 for ln in ass.read_text().splitlines()
+    ndlg = sum(1 for ln in ass.read_text(encoding="utf-8").splitlines()
                if ln.startswith("Dialogue:")) if ass.exists() else 0
     print(f"  [INFO] captions: {ndlg} cue(s)" +
           ("" if ndlg else " — none (fine for a no-speech montage; verify if you expected some)"))
@@ -440,7 +509,7 @@ def main():
                          "(duration, -14 LUFS loudness; caption count reported) and exit")
     args = ap.parse_args()
 
-    spec = json.loads(args.spec.read_text())
+    spec = json.loads(args.spec.read_text(encoding="utf-8"))
     cfg = {**DEFAULTS, **spec}
     cfg["captions"] = {**DEFAULTS["captions"], **spec.get("captions", {})}
     edit = Path(cfg.get("output_dir") or args.spec.parent).resolve()
@@ -526,4 +595,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RenderConfigError as e:
+        sys.exit(f"ERROR: {e}")
