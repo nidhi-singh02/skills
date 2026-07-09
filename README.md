@@ -26,3 +26,9 @@ Then in Claude Code/Codex/Cursor, just ask for the thing the skill does (e.g.
 it triggers automatically from its description. Each skill's own README covers
 its prerequisites and usage.
 
+## shorts-from-takes video walkthrough
+
+This walkthrough covers installation, how to use the skill, and the complete workflow for
+turning multiple shots or takes into a finished Short.
+
+[![Watch the shorts-from-takes installation and usage walkthrough](https://img.youtube.com/vi/bTORVA83vSI/maxresdefault.jpg)](https://youtu.be/bTORVA83vSI)
