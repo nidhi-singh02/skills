@@ -30,6 +30,8 @@ DEFAULTS = {
     "version": "v1",
     "speed": 1.0,                 # 1.0 keeps native pacing; e.g. 1.2 punches up talking-head takes (pitch preserved)
     "xfade": 0.2,                 # crossfade seconds at block joins
+    "xfade_type": "fade",         # ffmpeg xfade transition for every block join (fade, slideup, wipeleft, ...)
+    "xfade_types": [],            # optional per-join override, in block-join order; falls back to xfade_type
     "fps": 30,
     "width": 1080, "height": 1920,
     "title_seconds": 3.0,         # title card shown 0..N, fades in/out
@@ -410,8 +412,12 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
             le = min(cursor + 0.12, cue_end_limit - 0.02)
             if le <= ls:
                 continue
+            # per-segment MarginV override (Dialogue field; 0 = inherit the style's
+            # marginv). Lets one shot lift its captions to clear on-screen content, e.g.
+            # a terminal status bar or a lower-third, without moving every other cue.
+            mv = int(seg.get("marginv", 0))
             dlg.append((ls, le, f"Dialogue: 0,{_ass_ts(ls)},{_ass_ts(le)},"
-                                f"Pop,,0,0,0,,{pop}{''.join(parts).strip()}"))
+                                f"Pop,,0,0,{mv},,{pop}{''.join(parts).strip()}"))
     dlg.sort()
     out.write_text(header + "\n".join(d[2] for d in dlg) + "\n", encoding="utf-8")
     print(f"  master.ass: {len(dlg)} cues")
@@ -557,9 +563,11 @@ def main():
     print("4) composite (xfade chain -> title -> captions LAST)")
     ts = cfg["title_seconds"]
     vp, cur = [], "[0:v]"
+    xft = cfg.get("xfade_types") or []   # per-join transition; else the single xfade_type
     for j in range(1, n):
         nl = f"[xv{j}]"
-        vp.append(f"{cur}[{j}:v]xfade=transition=fade:duration={XF}:"
+        tr = xft[j - 1] if j - 1 < len(xft) else cfg["xfade_type"]
+        vp.append(f"{cur}[{j}:v]xfade=transition={tr}:duration={XF}:"
                   f"offset={xf_off[j]:.3f}{nl}"); cur = nl
     ti = n
     vp.append(f"[{ti}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,"
