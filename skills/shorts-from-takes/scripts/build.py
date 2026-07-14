@@ -326,12 +326,18 @@ def _ass_ts(s):
 
 
 def _caption_measurer(cfg, fonts_dir):
-    """Return (measure_fn, safe_px) for keeping cues inside the frame, or (None, 0).
+    """Return (measure_fn, safe_px, fit_fs) for keeping cues inside the frame, or (None, 0, None).
 
     libass normalizes `Fontsize` by the font's (ascent+descent) cell, not the em square,
     so a font with tall vertical metrics renders visibly smaller than PIL reports at the
     same number. Scale PIL widths by fontsize/(ascent+descent) to line up with libass
-    (empirically within ~2%). `safe_px` is PlayResX minus the style's L/R margins."""
+    (empirically within ~2%). `safe_px` is PlayResX minus the style's L/R margins.
+
+    `fit_fs(t)` is the largest `\\fs` that keeps `t` inside `safe_px`. Only the glyph
+    advances scale with `\\fs`; the per-char spacing and the outline (`\\bord`) are fixed
+    (ScaledBorderAndShadow scales border by the coordinate scale, which is 1.0 here since
+    PlayRes == output), so shrink on the scalable part alone or the fixed outline pushes a
+    boundary cue back over the edge."""
     c = cfg["captions"]
     try:
         from PIL import ImageFont
@@ -339,10 +345,19 @@ def _caption_measurer(cfg, fonts_dir):
         asc, desc = f.getmetrics()
         k = c["fontsize"] / max(1, asc + desc)
         spacing = 2  # matches the style's Spacing field below
-        measure = lambda t: f.getlength(t) * k + spacing * len(t) + 2 * c["outline"]
-        return measure, cfg["width"] - 2 * 70  # MarginL/MarginR are 70 in the style
+        safe_px = cfg["width"] - 2 * 70  # MarginL/MarginR are 70 in the style
+        fixed = lambda t: spacing * len(t) + 2 * c["outline"]  # unaffected by \fs
+        measure = lambda t: f.getlength(t) * k + fixed(t)
+
+        def fit_fs(t):
+            glyph = f.getlength(t) * k
+            if glyph <= 0:
+                return c["fontsize"]
+            return max(1, int(c["fontsize"] * (safe_px - fixed(t)) / glyph))
+
+        return measure, safe_px, fit_fs
     except Exception:
-        return None, 0
+        return None, 0, None
 
 
 def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
@@ -353,7 +368,7 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
     # than the usable width silently runs off both edges (clipped). Measure each cue: a
     # too-wide multi-word cue gets an \N break near its middle; a single word that still
     # overflows gets an \fs shrink. Only active when the font is measurable (fonts_dir set).
-    measure, safe_px = _caption_measurer(cfg, fonts_dir) if fonts_dir else (None, 0)
+    measure, safe_px, fit_fs = _caption_measurer(cfg, fonts_dir) if fonts_dir else (None, 0, None)
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         f"PlayResX: {cfg['width']}\nPlayResY: {cfg['height']}\n"
@@ -432,9 +447,9 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
                     brk = len(txts) // 2
                 lines = ([" ".join(txts[:brk]), " ".join(txts[brk:])] if brk
                          else [" ".join(txts)])
-                widest = max(measure(x) for x in lines)
-                if widest > safe_px:
-                    shrink = f"{{\\fs{max(1, int(c['fontsize'] * safe_px / widest))}}}"
+                widest_line = max(lines, key=measure)
+                if measure(widest_line) > safe_px:
+                    shrink = f"{{\\fs{fit_fs(widest_line)}}}"
             parts, cursor = ([shrink] if shrink else []), ls
             for wi, w in enumerate(ch):
                 ws, we = ot(w["start"]), ot(w["end"])
