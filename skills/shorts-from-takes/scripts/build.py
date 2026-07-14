@@ -569,6 +569,10 @@ def main():
     ap_, acur = [], "[0:a]"
     for j in range(1, n):
         nl = f"[xa{j}]"; ap_.append(f"{acur}[{j}:a]acrossfade=d={XF}{nl}"); acur = nl
+    # With a single block the acrossfade loop never runs, so audio never enters the
+    # filtergraph. Map the input stream directly (0:a, no brackets) — a bracketed
+    # "[0:a]" would be read as a filtergraph label that doesn't exist and ffmpeg aborts.
+    amap = acur if n > 1 else "0:a"
     fc = ";".join(vp + ap_)
 
     crf = "20" if preview else "18"
@@ -578,7 +582,7 @@ def main():
     for bf in bfiles:
         cmd += ["-i", str(bf)]
     cmd += ["-loop", "1", "-t", f"{ts}", "-i", str(edit / "title.png"),
-            "-filter_complex", fc, "-map", "[outv]", "-map", acur,
+            "-filter_complex", fc, "-map", "[outv]", "-map", amap,
             "-c:v", "libx264", "-preset", "fast", "-crf", crf, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-movflags", "+faststart", str(prenorm)]
