@@ -28,7 +28,7 @@ heavy lifting (transcription, timeline inspection, ffmpeg know-how); this carrie
 
 A finished Short built with this skill — raw takes in, posted vertical out:
 
-▶ **[Watch the Short on YouTube](https://youtube.com/shorts/BmN-N9cK1PY)**
+▶ **[Watch the Short on YouTube](https://www.youtube.com/shorts/BmN-N9cK1PY)**
 
 ## How it works
 
