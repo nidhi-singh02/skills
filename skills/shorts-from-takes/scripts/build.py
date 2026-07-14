@@ -552,7 +552,9 @@ def main():
 
     print("3) captions + title")
     build_ass(segs, offsets, cfg, edit, edit / "master.ass")
-    make_title(cfg, fonts_dir, edit / "title.png")
+    has_title = bool(cfg["title"].strip())  # title is optional; skip the whole title path if empty
+    if has_title:
+        make_title(cfg, fonts_dir, edit / "title.png")
 
     print("4) composite (xfade chain -> title -> captions LAST)")
     ts = cfg["title_seconds"]
@@ -561,11 +563,13 @@ def main():
         nl = f"[xv{j}]"
         vp.append(f"{cur}[{j}:v]xfade=transition=fade:duration={XF}:"
                   f"offset={xf_off[j]:.3f}{nl}"); cur = nl
-    ti = n
-    vp.append(f"[{ti}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,"
-              f"fade=t=out:st={ts-0.3:.2f}:d=0.3:alpha=1[ttl]")
-    vp.append(f"{cur}[ttl]overlay=(W-w)/2:110:enable='between(t,0,{ts})'[v1]")
-    vp.append("[v1]ass=master.ass:fontsdir=" + str(fonts_dir) + "[outv]")
+    if has_title:
+        ti = n  # title.png is appended as input index n, after the n block inputs
+        vp.append(f"[{ti}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,"
+                  f"fade=t=out:st={ts-0.3:.2f}:d=0.3:alpha=1[ttl]")
+        vp.append(f"{cur}[ttl]overlay=(W-w)/2:110:enable='between(t,0,{ts})'[v1]")
+        cur = "[v1]"
+    vp.append(f"{cur}ass=master.ass:fontsdir=" + str(fonts_dir) + "[outv]")
     ap_, acur = [], "[0:a]"
     for j in range(1, n):
         nl = f"[xa{j}]"; ap_.append(f"{acur}[{j}:a]acrossfade=d={XF}{nl}"); acur = nl
@@ -577,8 +581,9 @@ def main():
     cmd = ["ffmpeg", "-y"]
     for bf in bfiles:
         cmd += ["-i", str(bf)]
-    cmd += ["-loop", "1", "-t", f"{ts}", "-i", str(edit / "title.png"),
-            "-filter_complex", fc, "-map", "[outv]", "-map", acur,
+    if has_title:
+        cmd += ["-loop", "1", "-t", f"{ts}", "-i", str(edit / "title.png")]
+    cmd += ["-filter_complex", fc, "-map", "[outv]", "-map", acur,
             "-c:v", "libx264", "-preset", "fast", "-crf", crf, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-movflags", "+faststart", str(prenorm)]
