@@ -327,10 +327,50 @@ def _ass_ts(s):
     return f"{h:d}:{m:02d}:{sec:02d}.{c:02d}"
 
 
-def build_ass(segs, offsets, cfg, edit, out: Path):
+def _caption_measurer(cfg, fonts_dir):
+    """Return (measure_fn, safe_px, fit_fs) for keeping cues inside the frame, or (None, 0, None).
+
+    libass normalizes `Fontsize` by the font's (ascent+descent) cell, not the em square,
+    so a font with tall vertical metrics renders visibly smaller than PIL reports at the
+    same number. Scale PIL widths by fontsize/(ascent+descent) to line up with libass
+    (empirically within ~2%). `safe_px` is PlayResX minus the style's L/R margins.
+
+    `fit_fs(t)` is the largest `\\fs` that keeps `t` inside `safe_px`. Only the glyph
+    advances scale with `\\fs`; the per-char spacing and the outline (`\\bord`) are fixed
+    (ScaledBorderAndShadow scales border by the coordinate scale, which is 1.0 here since
+    PlayRes == output), so shrink on the scalable part alone or the fixed outline pushes a
+    boundary cue back over the edge."""
+    c = cfg["captions"]
+    try:
+        from PIL import ImageFont
+        f = ImageFont.truetype(str(fonts_dir / c["fontfile"]), c["fontsize"])
+        asc, desc = f.getmetrics()
+        k = c["fontsize"] / max(1, asc + desc)
+        spacing = 2  # matches the style's Spacing field below
+        safe_px = cfg["width"] - 2 * 70  # MarginL/MarginR are 70 in the style
+        fixed = lambda t: spacing * len(t) + 2 * c["outline"]  # unaffected by \fs
+        measure = lambda t: f.getlength(t) * k + fixed(t)
+
+        def fit_fs(t):
+            glyph = f.getlength(t) * k
+            if glyph <= 0:
+                return c["fontsize"]
+            return max(1, int(c["fontsize"] * (safe_px - fixed(t)) / glyph))
+
+        return measure, safe_px, fit_fs
+    except Exception:
+        return None, 0, None
+
+
+def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
     c = cfg["captions"]
     pop = (r"{\fad(50,0)\fscx84\fscy84\t(0,110,\fscx100\fscy100)}"
            if c.get("pop") else "")
+    # Keep cues inside the frame. WrapStyle 2 disables libass auto-wrap, so a cue wider
+    # than the usable width silently runs off both edges (clipped). Measure each cue: a
+    # too-wide multi-word cue gets an \N break near its middle; a single word that still
+    # overflows gets an \fs shrink. Only active when the font is measurable (fonts_dir set).
+    measure, safe_px, fit_fs = _caption_measurer(cfg, fonts_dir) if fonts_dir else (None, 0, None)
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         f"PlayResX: {cfg['width']}\nPlayResY: {cfg['height']}\n"
@@ -398,16 +438,29 @@ def build_ass(segs, offsets, cfg, edit, out: Path):
             if ot(ch[-1]["end"]) <= subs_start:
                 continue
             ls = max(ls, subs_start)
-            parts, cursor = [], ls
-            for w in ch:
+            txts = [name_fix.get(t, t) for t in
+                    (re.sub(r"\s+", " ", w["text"]).strip().rstrip(",.;:!?").upper()
+                     for w in ch)]
+            # keep the rendered cue inside safe_px: break wide multi-word cues, shrink a
+            # lone word that still overflows (see WrapStyle note above).
+            brk, shrink = None, ""
+            if measure:
+                if len(txts) > 1 and measure(" ".join(txts)) > safe_px:
+                    brk = len(txts) // 2
+                lines = ([" ".join(txts[:brk]), " ".join(txts[brk:])] if brk
+                         else [" ".join(txts)])
+                widest_line = max(lines, key=measure)
+                if measure(widest_line) > safe_px:
+                    shrink = f"{{\\fs{fit_fs(widest_line)}}}"
+            parts, cursor = ([shrink] if shrink else []), ls
+            for wi, w in enumerate(ch):
                 ws, we = ot(w["start"]), ot(w["end"])
                 gap = ws - cursor
                 if gap > 0.02:
                     parts.append(f"{{\\k{int(round(gap*100))}}}")
                 d = max(0.06, we - max(ws, cursor))
-                txt = re.sub(r"\s+", " ", w["text"]).strip().rstrip(",.;:!?").upper()
-                txt = name_fix.get(txt, txt)
-                parts.append(f"{{\\kf{int(round(d*100))}}}{txt} ")
+                sep = r"\N" if brk is not None and wi == brk - 1 else " "
+                parts.append(f"{{\\kf{int(round(d*100))}}}{txts[wi]}{sep}")
                 cursor = we
             le = min(cursor + 0.12, cue_end_limit - 0.02)
             if le <= ls:
@@ -557,7 +610,7 @@ def main():
     print(f"   total ~{acc:.2f}s, {n} block(s), {n-1} xfade(s)")
 
     print("3) captions + title")
-    build_ass(segs, offsets, cfg, edit, edit / "master.ass")
+    build_ass(segs, offsets, cfg, edit, edit / "master.ass", fonts_dir=fonts_dir)
     has_title = bool(cfg["title"].strip())  # title is optional; skip the whole title path if empty
     if has_title:
         make_title(cfg, fonts_dir, edit / "title.png")
