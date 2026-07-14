@@ -6,12 +6,14 @@ trims, orders, stitches, and burns the look onto **any** footage — talking-hea
 recordings, b-roll, product, travel, gameplay, vlog:
 
 - **Selects + concatenates** your clips into a single short, in whatever arc the material wants
+- **Locks story before rendering** with a speaker-attributed paper edit and continuity pass
 - **Fits every clip to vertical** — portrait fills the frame; wide clips blur-fill (keep all
   pixels) or `fit: cover` to crop full-frame; orientation auto-detected per clip
 - **Hormozi-style captions** (optional) — word-by-word, ALL-CAPS, thick outline, yellow fill,
   pop-in; clips with no speech simply carry none
-- **Title card**, optional **speed-up** (pitch preserved) and per-clip **warm relight**,
+- **Title/end cards**, per-segment **speed** (pitch preserved), gain matching and warm relight,
   gentle denoise, **−14 LUFS** audio
+- **Quality gate** for duration, loudness, black frames, accidental frozen holds, and captions
 - **Ready-to-post metadata** tuned per platform (YouTube Shorts / Instagram Reels / X)
 
 It's an opinionated **house-style layer on top of** the
@@ -33,13 +35,13 @@ A finished Short built with this skill — raw takes in, posted vertical out:
 ## How it works
 
 ```
-raw clips ──▶ transcribe ──▶ select + order clips ──▶ write spec.json ──▶ build.py ──▶ final_v1.mp4
- (any)       (optional)      (judgment, with you)      (segments+blocks)   (ffmpeg)     + captions
+raw clips ──▶ transcribe ──▶ paper edit ──▶ spec.json ──▶ build.py ──▶ check ──▶ final_v1.mp4
+ (any)       (optional)      (story lock)   (timeline)     (ffmpeg)     (QC)      + captions
 ```
 
-`build.py` reads a `spec.json` (which clips, which time ranges, the title, any fixes) and
-renders: per-segment fit-to-vertical + optional speed/grade → lossless concat into blocks →
-crossfade at orientation flips → title overlay → captions applied last → loudness normalize.
+`build.py` reads a `spec.json` (which clips, ranges, pacing, transitions, title, and fixes) and
+renders: per-segment fit-to-vertical + optional speed/grade/audio balance → lossless concat into
+blocks → per-join transitions → title overlay → captions applied last → loudness normalize.
 
 ## Prerequisites
 
@@ -76,10 +78,12 @@ uv run python helpers/pack_transcripts.py --edit-dir "/path/to/your-project/edit
 This writes a transcript JSON per clip into `…/edit/transcripts/` and a readable
 `takes_packed.md` for spotting the best material. Skip this step entirely for no-speech montages.
 
-**3. Write a spec.** Copy [`scripts/spec.example.json`](scripts/spec.example.json) and edit
-it: point `src` at your clips, set each `start`/`end`; optionally `kind` (portrait/landscape —
-omit to auto-detect), `grade: true` for a warm relight, or `fit: cover` to crop a wide clip
-full-frame; group `blocks`; set the `title`. Full schema and the correctness rules are in
+**3. Lock the story, then write a spec.** Follow
+[`references/editorial-workflow.md`](references/editorial-workflow.md) to audit all footage and
+write the exact speaker-attributed line/action order. Then copy
+[`scripts/spec.example.json`](scripts/spec.example.json): set each `src`/`start`/`end`; optionally
+set per-segment `speed`, `audio_gain_db`, `kind`, `grade`, or `fit`; group `blocks`; assign
+purposeful per-join `transitions`; set the `title`. Full schema and correctness rules are in
 [`references/render-notes.md`](references/render-notes.md).
 
 **4. Render:**
@@ -89,6 +93,8 @@ full-frame; group `blocks`; set the `title`. Full schema and the correctness rul
 uv run --with pillow python scripts/build.py scripts/spec.json --preview
 # final
 uv run --with pillow python scripts/build.py scripts/spec.json
+# automated delivery gate
+uv run --with pillow python scripts/build.py scripts/spec.json --check
 ```
 
 Output lands in `output_dir` as `final_v1.mp4` (bump `version` in the spec to compare
@@ -100,12 +106,12 @@ titles/captions to `…/edit/social_metadata.md`.
 
 ## The house style is defaults, not laws
 
-Everything in the look is a starting point you can override per-key in the spec —
-`speed` (default 1.0), `xfade`, `grade_filter`, `blur_sigma`, `denoise`, `subs_start`, and the
-whole `captions` block (font, size, position, colours, words-per-cue). Per segment: `kind`,
-`grade`, `fit`, `crop`. Leave a key out and the [`build.py`](scripts/build.py) default applies.
-The *creative* calls — which clip, exact trims, how warm the grade — are judgment made by
-looking at the footage, not hard-coded.
+Everything in the look is a starting point you can override per-key in the spec — global `speed`,
+legacy `xfade`, per-join `transitions`, `grade_filter`, `blur_sigma`, `denoise`, `subs_start`,
+`quality_checks`, and the whole `captions` block. Per segment: `speed`, `audio_gain_db`, `denoise`,
+`kind`, `grade`, `fit`, `crop`. Leave a key out and the [`build.py`](scripts/build.py) default
+applies. The creative calls — exact lines, trims, coverage, pace, transition purpose, and grade —
+remain judgments made after reviewing the footage, not hard-coded rules.
 
 ## Fonts & license
 

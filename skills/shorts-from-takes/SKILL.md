@@ -55,16 +55,18 @@ single video, use `video-use` directly.
 - **Fit to vertical:** portrait clips fill the frame (center-crop); wide clips default to a
   blurred fill so nothing is lost, or `fit: cover` to crop them full-frame. Orientation is
   auto-detected per clip (or set `kind` explicitly).
-- **Speed:** native (1.0). Bump to ~1.2x (pitch preserved) to tighten talking-head takes.
+- **Speed:** native (1.0). Use small per-segment changes to tighten setup without rushing proof,
+  emotion, or a decisive answer; pitch is preserved.
 - **Look:** native colour by default. Opt a clip into a warm relight with `grade: true` (lift
   shadows, tame highlights) — good for faces/skin; leave screen/UI and already-graded footage native.
-- **Transitions:** hard cuts within a run of same-orientation clips; a quick 0.2s crossfade at
-  orientation flips and between two different takes/shots you want to dissolve.
+- **Transitions:** hard cuts for continuous thought; short, per-join transitions only when they
+  communicate a real change in speaker, time, place, medium, or section.
 - **Captions (optional):** Hormozi style — Anton, ALL CAPS, thick stroke, word-by-word yellow
   fill, quick pop-in; in the cross-platform safe zone. Clips with no speech (or no transcript)
   simply carry none — montages work fine.
 - **Title card:** top, first ~3s, fading out.
-- **Audio:** gentle denoise + high-pass, normalized to −14 LUFS (turn denoise off for music-led clips).
+- **Audio:** gentle denoise + high-pass, optional per-segment gain matching, normalized to −14
+  LUFS. Silent b-roll and generated graphics receive a silent track automatically.
 - **Output:** versioned files (`final_v1.mp4`, `final_v2.mp4`, …) so iterations compare.
 
 These are starting points, not laws. The *creative* picks — which clip, exact trim points,
@@ -80,21 +82,32 @@ how warm, font size — are judgment calls made by looking at the footage.
   `uv run python <video-use>/helpers/transcribe_batch.py "<folder>" --edit-dir "<folder>/edit"`
   then `pack_transcripts.py --edit-dir "<folder>/edit"`. Cache — never re-transcribe. Skip this
   entirely for no-speech montages.
-- Read `takes_packed.md`. Note false starts, look-aways, mis-speaks, and the best of each beat.
+- Analyze every supplied clip before selecting anything. Read `takes_packed.md`; note speakers,
+  meaning, false starts, repeated ideas, look-aways, camera adjustments, and the best performance
+  of each beat.
 
-### 2. Select + order the clips + confirm the plan (judgment — do NOT skip)
-- Choose the best clip/take per beat and order them so they flow. Drill into specific moments
-  with `video-use`'s `timeline_view.py` (filmstrip+waveform) to find clean cut points and to
-  spot look-aways/awkward pauses to trim.
+### 2. Write and approve the paper edit (judgment — do NOT skip)
+- Read `references/editorial-workflow.md`. Write a brief (audience, promise, focus, deprioritize),
+  then `paper_edit.md` with one numbered row per exact line/action: beat, stable speaker/subject,
+  source range, purpose, and dependency/bridge.
+- For interviews, retain enough question context, keep both participants meaningfully present,
+  and place each answer beside the question it actually answers. Balance follows editorial
+  function, not a fixed screen-time quota.
+- Read the proposed lines without the footage. Fix missing antecedents, undefined terms, topic
+  jumps, repeated setup, unsupported conclusions, and endings that merely stop. Prefer a longer
+  coherent thought over a shorter but confusing montage of fragments.
+- Choose the strongest performance and coverage only after the line order works. Drill into
+  specific moments with `video-use`'s `timeline_view.py` (filmstrip+waveform) to find clean cut
+  points and spot look-aways or awkward pauses.
 - For spoken clips, snap cuts to word boundaries and pad edges — the exact rule (and why
   cutting inside a word fails) is `references/render-notes.md` hard rule 8.
-- Confirm the plain-English plan (clip order, trims, title, any name corrections) with the
-  user before rendering.
+- Confirm the paper edit when the user asks to approve lines, structure, focus, or speaker balance.
+  Once approved, do not silently change its meaning or order during visual polishing.
 
 ### 3. Write the spec + render
 - Copy `scripts/spec.example.json`, fill `segments` (`src`/`start`/`end`, optional
-  `kind`/`grade`/`fit`/`beat`), `blocks` (group consecutive same-orientation clips; a crossfade
-  fires between blocks), `title`, `name_fix`, `version`.
+  `kind`/`grade`/`fit`/`beat`/`speed`/`audio_gain_db`), `blocks` (hard-cut runs), optional
+  per-join `transitions`, `quality_checks`, `title`, `name_fix`, and `version`.
 - Preview: `python scripts/build.py <spec.json> --preview`
 - Final:   `python scripts/build.py <spec.json>`
 - See `references/render-notes.md` for the spec schema, the production-correctness rules,
@@ -104,12 +117,13 @@ how warm, font size — are judgment calls made by looking at the footage.
 Render failures here are *silent* — a mis-ordered filter, a hidden caption, or a skipped
 loudnorm looks fine in the ffmpeg log and only shows on an actual frame or waveform. So grade
 the rendered file, not the plan, before the user ever sees it.
-- Run the automated gate first: `python scripts/build.py <spec.json> --check` asserts output
-  duration and −14 LUFS loudness against the spec (and reports the caption-cue count).
+- Run the automated gate first: `python scripts/build.py <spec.json> --check` validates output
+  duration, −14 LUFS loudness, black frames, and frozen holds (and reports caption cues). Treat a
+  freeze warning as something to fix unless the hold is intentional and explicitly allow-listed.
 - Then eyeball what a script can't, per the Self-eval recipe in `references/render-notes.md`
-  (frames at each cut, title, first/last 2s; captions readable + in safe zone; grade
-  consistent; names corrected). Fix → re-render → re-check, cap 3 passes. Bump `version` each
-  iteration so the user can compare.
+  (frames at every cut, first/last 2s, question-answer continuity, both interview participants,
+  captions in the safe zone, grade consistency, and the transition into any end card). Fix →
+  re-render → re-check, cap 3 passes. Bump `version` each iteration so the user can compare.
 
 ### 5. Posting metadata (optional — when asked, or offer it)
 Write platform-tuned metadata to `<edit>/social_metadata.md` per
@@ -121,6 +135,8 @@ trends first (web search); the reference encodes the durable rules but trends mo
 - `scripts/build.py` — the render engine (reads a spec.json; `--preview` and `--check` modes).
   Self-contained: borrows video-use's loudnorm if present, else uses a built-in 2-pass.
 - `scripts/spec.example.json` — worked example: several clips assembled into one Short (copy + edit paths).
+- `references/editorial-workflow.md` — required paper-edit, continuity, interview, pacing, and
+  branded-ending workflow. Read before selecting segments.
 - `references/render-notes.md` — spec schema + hard rules + gotchas. Read before editing render.
 - `references/social-metadata.md` — the 4-platform metadata playbook + paste-ready templates.
 - `references/transcript-schema.md` — the transcript JSON captions read (bring your own).

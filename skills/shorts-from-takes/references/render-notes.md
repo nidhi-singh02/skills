@@ -7,17 +7,28 @@ correctness rules where deviation fails *silently* (looks fine in the log, broke
 
 Required:
 - `segments`: ordered array. Each needs `{ "src": abs path, "start": sec, "end": sec }`,
-  plus optional `"kind"`, `"grade"`, `"fit"`, `"beat"`, `"crop"`, `"bg_crop"`, `"transcript"`.
+  plus optional `"kind"`, `"grade"`, `"fit"`, `"beat"`, `"crop"`, `"bg_crop"`, `"transcript"`,
+  `"speed"`, `"denoise"`, and `"audio_gain_db"`.
   - `kind` (optional): `"portrait"`/`"vertical"` or `"landscape"`/`"wide"` (legacy `"face"`/
     `"laptop"` still accepted). OMIT to auto-detect orientation from the source (rotation-aware).
   - `fit` (landscape): `"blur"` (default — sharp clip over its own blurred fill, keeps every
     pixel) or `"cover"` (scale-to-fill + center-crop; no bars, edges lost). Portrait uses cover.
   - `grade` (optional): `true` applies the house relight; a filter string applies your own;
     default none (native colour). Opt in on faces/skin, not on screen/UI or graded footage.
+  - `speed` (optional): per-segment playback rate, pitch preserved. Overrides global `speed`.
+    Use restrained differences to compress setup without rushing proof or emotion.
+  - `denoise` (optional): per-segment audio filter override; `""` disables it for music or a
+    source that is already processed.
+  - `audio_gain_db` (optional): pre-normalization gain for matching uneven speakers/takes.
+    Loudnorm controls final programme level; this controls balance *between* segments.
+  - `speaker`, `beat`, and other paper-edit metadata are allowed and ignored by the renderer.
+    Keep them in the spec when they make review and continuity auditing clearer.
 - `blocks`: array of index arrays grouping consecutive segments, e.g. `[[0,1],[2,3],[4],[5]]`.
   Segments inside a block are hard-cut (lossless concat); a crossfade fires BETWEEN blocks.
   Group same-orientation / same-clip runs together; put each orientation flip (and each
   different take/shot you want to dissolve) on a block boundary.
+- Every segment index must appear in `blocks` exactly once. The renderer now fails before ffmpeg
+  on duplicates, omissions, invalid indices, empty blocks, non-positive trims, or invalid speeds.
 
 Common overrides (else house-style defaults in `build.py`):
 - `version` (output suffix), `title`, `subs_start` (0.0 = caption from first word;
@@ -26,6 +37,52 @@ Common overrides (else house-style defaults in `build.py`):
   recipe `grade: true` uses), `blur_sigma` (landscape blur strength), `denoise` ("" disables),
   `xfade`, `output_dir`, `transcripts_dir`, `captions` (font/fontsize/marginv/colours/pop/max_words),
   `video_use_helpers`.
+
+### Per-join transitions
+
+`xfade` + `xfade_type` remain the global defaults, and legacy `xfade_types` still works. Prefer
+`transitions` when joins need different timing:
+
+```json
+"transitions": [
+  { "type": "fade", "duration": 0.12 },
+  { "type": "wipeleft", "duration": 0.20 }
+]
+```
+
+Entries map to block joins in order. Missing entries fall back to legacy/global settings. The
+same duration drives video `xfade`, audio `acrossfade`, total-duration math, segment offsets, and
+caption timing. Keep a join shorter than both adjacent timeline sides.
+
+### Automated signal checks
+
+`--check` runs black/freeze detection after duration and loudness checks. Defaults are recursively
+merged, so override only what changes:
+
+```json
+"quality_checks": {
+  "black_frames": {
+    "enabled": true,
+    "min_duration": 0.30,
+    "pixel_threshold": 0.02,
+    "severity": "error",
+    "allow_ranges": []
+  },
+  "freeze_frames": {
+    "enabled": true,
+    "min_duration": 1.50,
+    "noise_db": -50,
+    "severity": "warning",
+    "allow_ranges": [[12.0, 14.0]]
+  }
+}
+```
+
+Use `severity: "error"` for live-action finals when any frozen hold is unintended. Keep the broad
+default at `warning` because screen recordings and still-led montages can contain legitimate holds.
+Do not ignore warnings: add restrained motion, shorten the hold, disable the relevant check, or
+allow-list a reviewed range. Black frames fail by default because black tails commonly indicate a
+bad timeline or transition.
 
 ## Hard rules (silent-failure territory)
 
@@ -46,12 +103,12 @@ Common overrides (else house-style defaults in `build.py`):
    half-length for sub-60ms clips so the in/out fades never overlap). Prevents pops at the
    hard cuts inside a block. Block joins use `acrossfade` (the xfade handles the seam).
 6. **A/V sync at block joins: the video `xfade` and the audio `acrossfade` MUST share the
-   same duration.** Both shorten the total by `xfade` per join, so they stay locked only if
+   same per-join duration.** Both shorten the total by that duration, so they stay locked only if
    equal. `build.py` owns the offset accumulator (`acc` in `main()`) — don't recompute it by
    hand; a manual offset desyncs audio from video after the first join.
-7. **Caption times account for BOTH speed and xfade overlap.** `build.py` computes each cue's
+7. **Caption times account for BOTH per-segment speed and transition overlap.** `build.py` computes each cue's
    output time from the transcript; don't hand-edit timings — any manual offset drifts the
-   moment `speed` or a block boundary changes.
+   moment a segment speed or block boundary changes.
 8. **Never cut inside a word.** Snap to word boundaries from the transcript; pad
    30–200ms. Prefer silences ≥400ms as cut targets. (No transcript = no captions for that
    clip; the video still renders — fine for montages / no-speech footage.)
@@ -86,12 +143,20 @@ Common overrides (else house-style defaults in `build.py`):
 - Then loudnorm to −14 LUFS / −1 dBTP, two-pass (measure, then correct): video-use's helper
   if present, else the built-in in `build.py`. Two-pass lands ON target and holds true-peak
   under −1 dBTP, which single-pass can miss on a late loud transient (some players clip).
+- Use per-segment `audio_gain_db` to match noticeably uneven takes before loudnorm. Judge with
+  speech, not silence; avoid aggressive boosts that raise room noise. Use per-segment `denoise: ""`
+  for music or sources already mastered.
+- Sources without an audio stream are accepted. The extractor synthesizes stereo silence for the
+  trimmed output duration so silent b-roll, motion graphics, and generated end cards can participate
+  in concat and acrossfade without breaking the audio graph.
+- Every extracted segment is conformed to 48 kHz stereo before joining. This prevents mono/stereo
+  source changes from altering channel layout or destabilizing audio transitions mid-video.
 
 ## Self-eval recipe (use video-use's timeline_view on the OUTPUT, not the sources)
 Run `python scripts/build.py <spec.json> --check` first — it asserts output duration and
-−14 LUFS loudness (±1 LU; true-peak ≤ −0.5 dBTP, small slack over the −1 target) and reports
-the caption-cue count, so a silently skipped loudnorm or a `-ss/-t` duration regression fails
-loudly. Then eyeball what a script can't: at each cut ±1.5s look for visual jump/flash and
-audio-pop spikes in the waveform; sample the title, first/last 2s, mids; verify captions
-visible + safe-zone + readable, grade consistent, captions start when intended, names
-corrected. Cap 3 fix loops.
+−14 LUFS loudness (±1 LU; true-peak ≤ −0.5 dBTP, small slack over the −1 target), scans for
+black/frozen frames, and reports caption cues. Then inspect the rendered output, not just the
+spec: at every cut ±1.5s check logic, visual continuity, and audio-pop spikes; sample the title,
+first/last 2s, mids, and any end-card transition; verify captions are readable in the safe zone,
+grade is consistent, both interview speakers are represented as intended, names are corrected,
+and the ending resolves the paper-edit promise. Cap 3 fix loops.
