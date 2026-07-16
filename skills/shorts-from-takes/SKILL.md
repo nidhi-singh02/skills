@@ -24,11 +24,9 @@ metadata. This skill is a **thin preset over `video-use`**: `video-use` is the e
 and the metadata playbook.
 
 ## When this applies
-Someone hands you multiple clips — any mix of vertical talking-head, wide screen recordings or
-b-roll, phone footage, or already-cut reels — and wants them trimmed and combined into one
-posted short-form video (YouTube Shorts / Reels / TikTok / X). The clips might be several takes
-of the same lines, or distinct shots to assemble — both work. For a general/freeform edit of a
-single video, use `video-use` directly.
+Trigger and content coverage are in the description above. The one routing rule worth
+repeating: for a general/freeform edit of a *single* video, use `video-use` directly — this
+skill is specifically for combining *several* clips into one posted Short.
 
 ## Prerequisites
 - **`ffmpeg` + `ffprobe`** on PATH, and **Python 3** with **`pillow`**. Zero-setup run:
@@ -36,8 +34,8 @@ single video, use `video-use` directly.
   `pip install -r requirements.txt` in any env.
 - **Transcription** (word-level timestamps) — captions need one transcript JSON per clip:
   - *Recommended:* the `video-use` skill (engine) — clone
-    `https://github.com/browser-use/video-use`, put an `ELEVENLABS_API_KEY` (the free
-    tier includes credits) in its `.env`, then run its `transcribe_batch.py` +
+    `https://github.com/browser-use/video-use`, put an `ELEVENLABS_API_KEY` in its `.env`
+    (verify current free-tier terms), then run its `transcribe_batch.py` +
     `pack_transcripts.py`. `build.py` auto-detects it; or point via the `VIDEO_USE_HELPERS`
     env var / `video_use_helpers` in the spec.
   - *Bring your own:* any tool that emits word timestamps (WhisperX, faster-whisper,
@@ -80,7 +78,10 @@ how warm, font size — are judgment calls made by looking at the footage.
   `uv run python <video-use>/helpers/transcribe_batch.py "<folder>" --edit-dir "<folder>/edit"`
   then `pack_transcripts.py --edit-dir "<folder>/edit"`. Cache — never re-transcribe. Skip this
   entirely for no-speech montages.
-- Read `takes_packed.md`. Note false starts, look-aways, mis-speaks, and the best of each beat.
+- Read `takes_packed.md` for the words, AND scan a few frames per take (video-use's
+  `timeline_view.py`) for the visual read — a transcript can't show look-aways or energy. Rank
+  takes per beat: a fatal error (a mis-spoken product name / CTA) disqualifies first; among the
+  clean takes pick the highest energy/delivery; break ties on the cleaner cut point.
 
 ### 2. Select + order the clips + confirm the plan (judgment — do NOT skip)
 - Choose the best clip/take per beat and order them so they flow. Drill into specific moments
