@@ -24,8 +24,23 @@ Common overrides (else house-style defaults in `build.py`):
   3.0 = leave the open to the title), `name_fix` (`{"CLAWED":"CLAUDE"}` — UPPERCASE keys),
   `speed` (default 1.0 = native pacing; 1.2 tightens talking-head), `grade_filter` (the relight
   recipe `grade: true` uses), `blur_sigma` (landscape blur strength), `denoise` ("" disables),
-  `xfade`, `output_dir`, `transcripts_dir`, `captions` (font/fontsize/marginv/colours/pop/max_words),
+  `xfade`, `output_dir`, `transcripts_dir`, `captions` (font/fontsize/marginv/colours/pop/max_words/
+  `highlight` — colour for `highlight_words`), `highlight_words` (words tinted in the karaoke fill),
+  `top_titles` (beat labels rendered top-center: `[{"start","end","text","colour"?,"fontsize"?}]`
+  in OUTPUT seconds) + `top_title_marginv`, `inserts` (image B-roll overlays
+  `[{"file","start","end","x","y"}]`, alpha-faded, drawn under the captions),
   `video_use_helpers`.
+
+Per-segment extras (inside a `segments[]` entry): `marginv`, `crop`, `bg_crop`, `grade`, `fit`,
+plus:
+- `gain` (dB) — pure volume applied before denoise. Levels a take recorded without the mic
+  in hand (typically 15–20 LU under the mic'd takes — both hands on a prop, filming a
+  screen) up to its neighbours. Global loudnorm can't fix relative imbalance between
+  segments; measure each span (`ffmpeg -af loudnorm=print_format=json`) and set gain to
+  the difference. Pure gain leaves voice character untouched.
+- `zoom` `[z_start, z_end]` — animated zoom (cover fit only), interpolated linearly over
+  the segment: values > 1 magnify, start > end zooms out, equal values hold a fixed punch.
+  Sampled from a 4/3-oversized intermediate so zoom ≤ 1.33 never upscales.
 
 ## Hard rules (silent-failure territory)
 
@@ -55,6 +70,21 @@ Common overrides (else house-style defaults in `build.py`):
 8. **Never cut inside a word.** Snap to word boundaries from the transcript; pad
    30–200ms. Prefer silences ≥400ms as cut targets. (No transcript = no captions for that
    clip; the video still renders — fine for montages / no-speech footage.)
+9. **A block-join crossfade blends AUDIO too — it can eat the last word.** `acrossfade`
+   mixes the final `xfade` seconds (0.2s) of the outgoing segment into the incoming one; a
+   word landing in that tail gets swallowed or doubled. If a segment ends on a word that
+   carries the message (a name, the punchline, the CTA), either leave ≥250ms of clear
+   silence after it, or make that join a hard cut (merge the blocks) instead of dissolving.
+10. **`fps=` MUST precede `zoompan`.** On VFR / odd-timebase sources (phone footage)
+   zoompan otherwise multiplies the output frame count ~15x — the segment silently runs
+   many times its length and the final xfade offsets land hundreds of seconds out.
+11. **Measured durations, not spec math, for anything hand-timed.** AAC frame rounding
+   drifts each encoded segment ~+0.04s, so a 13-segment concat lands ~0.5s past the
+   nominal `sum(dur/speed) - joins*xfade`. Caption cues are safe (computed from measured
+   seg durations), but `top_titles`, `inserts`, and any SFX overlay you time by hand must
+   be placed against `ffprobe` durations of the rendered `clips/seg_*.mp4` files. Same
+   reason `--check`'s duration gate can show a ~0.5s gap on many-segment cuts — that
+   drift is benign.
 
 ## Orientation handling
 - Orientation is auto-detected from the source (rotation-aware) unless `kind` is set. If
@@ -95,3 +125,10 @@ loudly. Then eyeball what a script can't: at each cut ±1.5s look for visual jum
 audio-pop spikes in the waveform; sample the title, first/last 2s, mids; verify captions
 visible + safe-zone + readable, grade consistent, captions start when intended, names
 corrected. Cap 3 fix loops.
+
+One verification trap worth naming: **whisper mishears sped-up speech.** On a 1.2–1.3x
+output, a re-transcription can drop or garble short function words that are perfectly intact
+(e.g. "let me walk you through it" coming back as "let me you through it"). Before treating
+a missing word as a cut defect, extract that span, slow it back to 1.0x (`atempo`), and
+re-transcribe — if it's clean at 1x, the audio is fine. The genuine defect this masks is
+hard rule 9 (a crossfade actually eating the word), so check both.
