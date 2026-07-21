@@ -58,7 +58,15 @@ DEFAULTS = {
         "outline": 8, "shadow": 4,
         "pop": True,              # quick scale pop-in per cue
         "max_words": 2,
+        "highlight": "",          # ASS colour (&HAABBGGRR) for highlight_words; "" disables
     },
+    "highlight_words": [],        # words to tint captions.highlight (matched uppercase,
+                                  # after punctuation strip — same normalization as cues)
+    "top_titles": [],             # beat labels: [{"start","end","text","colour"?,"fontsize"?}]
+                                  # (output seconds), rendered top-center via the ASS Top style
+    "top_title_marginv": 210,     # Top style margin FROM THE TOP — below platform UI chrome
+    "inserts": [],                # image B-roll overlays: [{"file","start","end","x","y"}]
+                                  # (output seconds), alpha-faded, drawn under the captions
     # video-use helpers dir (OPTIONAL — only its 2-pass loudnorm is borrowed). Leave
     # null to auto-resolve from $VIDEO_USE_HELPERS / common paths, else the built-in
     # 2-pass loudnorm runs so this works with no external repo. See resolve_helpers().
@@ -246,8 +254,14 @@ def extract(seg, i, cfg, clips, preview):
     out = clips / f"seg_{i}.mp4"
     W, H, fps = cfg["width"], cfg["height"], cfg["fps"]
 
+    # per-segment gain (dB): level a take shot without the mic in hand (typically
+    # 15-20 LU under the mic'd takes) up to its neighbours. Pure volume, BEFORE the
+    # denoise so afftdn's noise floor sees the same levels on every segment; global
+    # loudnorm can't fix relative imbalance between segments, only overall level.
+    gv = float(seg.get("gain", 0))
+    gainf = f"volume={gv:g}dB," if gv else ""
     den = (cfg["denoise"] + ",") if cfg["denoise"] else ""
-    aud = (f"{den}{atempo_chain(spd)},"
+    aud = (f"{gainf}{den}{atempo_chain(spd)},"
            f"afade=t=in:st=0:d={fd:.3f},afade=t=out:st={fo:.3f}:d={fd:.3f}")
     tail = ["-c:v", "libx264", "-preset", preset, "-crf", crf,
             "-pix_fmt", "yuv420p", "-r", str(fps),
@@ -303,8 +317,29 @@ def extract(seg, i, cfg, clips, preview):
               f"setpts=PTS/{spd},fps={fps}[v];[0:a]{aud}[a]")
         cmd = head + ["-filter_complex", fc, "-map", "[v]", "-map", "[a]"] + tail
     else:  # cover — scale to fill then center-crop; works for any source aspect ratio
-        vf = (f"{tm}{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
-              f"crop={W}:{H},setsar=1{grade},setpts=PTS/{spd},fps={fps}")
+        # optional animated zoom: seg["zoom"] = [z_start, z_end], interpolated linearly
+        # over the segment (a push-in, a pull-back, or a "punch" that drifts). Two rules
+        # learned the hard way:
+        #  - `fps=` MUST run before zoompan: on VFR / odd-timebase sources (phone footage)
+        #    zoompan otherwise multiplies the frame count ~15x and the clip runs long.
+        #  - sample from a 4/3-oversized intermediate so any zoom <= 1.33 only ever
+        #    downscales (no upscale artifacts). Not offered on the blur fit: zooming the
+        #    sharp foreground against a static blur backdrop reads as a glitch.
+        zm = seg.get("zoom")
+        if zm:
+            z0, z1 = float(zm[0]), float(zm[1])
+            nfr = max(1, int(round(odur * fps)))
+            iw2, ih2 = int(W * 4 / 3) // 2 * 2, int(H * 4 / 3) // 2 * 2
+            vf = (f"{tm}fps={fps},{cropf}"
+                  f"scale={iw2}:{ih2}:force_original_aspect_ratio=increase,"
+                  f"crop={iw2}:{ih2},"
+                  f"zoompan=z='{z0}+({z1}-{z0})*in/{nfr}'"
+                  f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                  f":d=1:s={W}x{H}:fps={fps},"
+                  f"setsar=1{grade},setpts=PTS/{spd},fps={fps}")
+        else:
+            vf = (f"{tm}{cropf}scale={W}:{H}:force_original_aspect_ratio=increase,"
+                  f"crop={W}:{H},setsar=1{grade},setpts=PTS/{spd},fps={fps}")
         cmd = head + ["-vf", vf, "-af", aud] + tail
     kn = f"/{seg['kind']}" if seg.get("kind") else " auto"
     print(f"  seg{i} ({orient}{kn} {fit}, {seg.get('beat','')}) {odur:.2f}s -> {sdur:.2f}s")
@@ -382,7 +417,13 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
         "MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Pop,{c['font']},{c['fontsize']},{c['primary']},{c['secondary']},"
         f"{c['outline_colour']},&H66000000,0,0,0,0,100,100,2,0,1,"
-        f"{c['outline']},{c['shadow']},2,70,70,{c['marginv']},1\n\n"
+        f"{c['outline']},{c['shadow']},2,70,70,{c['marginv']},1\n"
+        # Top: beat labels / section titles. Alignment 8 = top-center, so MarginV is
+        # measured FROM THE TOP — keep it below the platforms' UI chrome (status bar,
+        # account row) but high enough to clear the subject's face.
+        f"Style: Top,{c['font']},72,&H00FFFFFF,&H00FFFFFF,"
+        f"{c['outline_colour']},&H66000000,0,0,0,0,100,100,2,0,1,"
+        f"6,3,8,70,70,{cfg.get('top_title_marginv', 210)},1\n\n"
         "[Events]\n"
         # MarginV REQUIRED in this Format line — omitting it leaks a comma into Text.
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
@@ -433,7 +474,7 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
                 chunks.append(cur); cur = []
         if cur:
             chunks.append(cur)
-        for ch in chunks:
+        for k, ch in enumerate(chunks):
             ls = ot(ch[0]["start"])
             if ot(ch[-1]["end"]) <= subs_start:
                 continue
@@ -452,6 +493,8 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
                 widest_line = max(lines, key=measure)
                 if measure(widest_line) > safe_px:
                     shrink = f"{{\\fs{fit_fs(widest_line)}}}"
+            hl = {x.upper() for x in cfg.get("highlight_words", [])}
+            hlc = c.get("highlight")
             parts, cursor = ([shrink] if shrink else []), ls
             for wi, w in enumerate(ch):
                 ws, we = ot(w["start"]), ot(w["end"])
@@ -460,9 +503,18 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
                     parts.append(f"{{\\k{int(round(gap*100))}}}")
                 d = max(0.06, we - max(ws, cursor))
                 sep = r"\N" if brk is not None and wi == brk - 1 else " "
-                parts.append(f"{{\\kf{int(round(d*100))}}}{txts[wi]}{sep}")
+                # highlight_words: retint this word's karaoke fill via \1c (the \kf sweep
+                # fills toward PrimaryColour, so overriding \1c changes the sung colour);
+                # restore the style's primary right after so following words are untouched.
+                tint = f"\\1c{hlc.replace('&H00', '&H')}" if hlc and txts[wi] in hl else ""
+                untint = f"{{\\1c{c['primary'].replace('&H00', '&H')}}}" if tint else ""
+                parts.append(f"{{\\kf{int(round(d*100))}{tint}}}{txts[wi]}{untint}{sep}")
                 cursor = we
-            le = min(cursor + 0.12, cue_end_limit - 0.02)
+            # a cue may not outlive the NEXT cue's start: the +0.12 hang otherwise
+            # overlaps it and libass draws both at the same spot (glyph collision —
+            # obvious with max_words=1, where every cue lands dead-center).
+            nxt = ot(chunks[k + 1][0]["start"]) - 0.01 if k + 1 < len(chunks) else 1e9
+            le = min(cursor + 0.12, cue_end_limit - 0.02, nxt)
             if le <= ls:
                 continue
             # per-segment MarginV override (Dialogue field; 0 = inherit the style's
@@ -471,6 +523,17 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
             mv = int(seg.get("marginv", 0))
             dlg.append((ls, le, f"Dialogue: 0,{_ass_ts(ls)},{_ass_ts(le)},"
                                 f"Pop,,0,0,{mv},,{pop}{''.join(parts).strip()}"))
+    # top_titles: hand-timed beat labels (OUTPUT seconds — after speed-up and xfade
+    # overlap; read the final timeline off the measured seg durations, not the spec math,
+    # since AAC frame rounding drifts the concat ~+0.04s per segment).
+    for tt in cfg.get("top_titles", []):
+        col = tt.get("colour")
+        ov = (r"{\fad(200,200)" +
+              (f"\\1c{col.replace('&H00', '&H')}" if col else "") +
+              (f"\\fs{tt['fontsize']}" if tt.get("fontsize") else "") + "}")
+        dlg.append((float(tt["start"]), float(tt["end"]),
+                    f"Dialogue: 1,{_ass_ts(float(tt['start']))},{_ass_ts(float(tt['end']))},"
+                    f"Top,,0,0,0,,{ov}{tt['text'].upper()}"))
     dlg.sort()
     out.write_text(header + "\n".join(d[2] for d in dlg) + "\n", encoding="utf-8")
     print(f"  master.ass: {len(dlg)} cues")
@@ -630,6 +693,18 @@ def main():
                   f"fade=t=out:st={ts-0.3:.2f}:d=0.3:alpha=1[ttl]")
         vp.append(f"{cur}[ttl]overlay=(W-w)/2:110:enable='between(t,0,{ts})'[v1]")
         cur = "[v1]"
+    # image inserts — B-roll glimpses (a screenshot, a chart, a doc snippet) floated
+    # over the video: [{"file","start","end","x","y"}] in OUTPUT seconds. 0.15s alpha
+    # fades in/out; applied before the ass filter so captions always draw on top.
+    ins_base = n + (1 if has_title else 0)
+    for m_i, ins in enumerate(cfg.get("inserts", [])):
+        st, en = float(ins["start"]), float(ins["end"])
+        vp.append(f"[{ins_base + m_i}:v]format=rgba,"
+                  f"fade=t=in:st={st:.2f}:d=0.15:alpha=1,"
+                  f"fade=t=out:st={en - 0.15:.2f}:d=0.15:alpha=1[ins{m_i}]")
+        vp.append(f"{cur}[ins{m_i}]overlay={ins['x']}:{ins['y']}:"
+                  f"enable='between(t,{st:.2f},{en:.2f})'[vi{m_i}]")
+        cur = f"[vi{m_i}]"
     vp.append(f"{cur}ass=master.ass:fontsdir=" + str(fonts_dir) + "[outv]")
     ap_, acur = [], "[0:a]"
     for j in range(1, n):
@@ -648,6 +723,8 @@ def main():
         cmd += ["-i", str(bf)]
     if has_title:
         cmd += ["-loop", "1", "-t", f"{ts}", "-i", str(edit / "title.png")]
+    for ins in cfg.get("inserts", []):
+        cmd += ["-loop", "1", "-t", f"{float(ins['end']) + 0.5:.2f}", "-i", str(ins["file"])]
     cmd += ["-filter_complex", fc, "-map", "[outv]", "-map", amap,
             "-c:v", "libx264", "-preset", "fast", "-crf", crf, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
