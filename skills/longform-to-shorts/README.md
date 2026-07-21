@@ -30,6 +30,9 @@ references/ffmpeg-recipes.md # every ffmpeg command + the gotchas (read before b
 scripts/gen_subs.py          # word-timings -> per-clip SRT (edit CLIPS dict; always hand-review output)
 ```
 
+## Example output
+A Short cut from a long-form YouTube video with this skill: [Your AI Agent Is Lying To You](https://www.youtube.com/shorts/BjtdvN_DdSM)
+
 ## Not for
 Raw multi-take footage (use **shorts-from-takes**), a single freeform edit, or captioning an already-finished short. This is specifically **finished long-form → many standalone verticals**.
 </content>
