@@ -1,5 +1,7 @@
 # skills for content creators
 
+[![skills.sh](https://skills.sh/b/nidhi-singh02/skills)](https://skills.sh/nidhi-singh02/skills)
+
 A small collection of [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
 for turning raw footage into finished, ready-to-post content. These are usable by any agent that supports skills.
 
