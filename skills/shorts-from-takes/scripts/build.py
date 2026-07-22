@@ -263,8 +263,14 @@ def extract(seg, i, cfg, clips, preview):
     den = (cfg["denoise"] + ",") if cfg["denoise"] else ""
     aud = (f"{gainf}{den}{atempo_chain(spd)},"
            f"afade=t=in:st=0:d={fd:.3f},afade=t=out:st={fo:.3f}:d={fd:.3f}")
+    # -r sets the frame RATE, but the MP4 timebase (tbn) still inherits from the source:
+    # a 29.97fps source leaves tbn=30000/1001 even at -r 30. concat_copy uses -c copy so it
+    # can't renormalize, and the block xfade then rejects mismatched timebases (error 234).
+    # -fps_mode cfr forces constant frame rate; -video_track_timescale pins a fixed tbn so
+    # every seg — whatever the source — shares one timebase and blocks concat + xfade cleanly.
     tail = ["-c:v", "libx264", "-preset", preset, "-crf", crf,
-            "-pix_fmt", "yuv420p", "-r", str(fps),
+            "-pix_fmt", "yuv420p", "-r", str(fps), "-fps_mode", "cfr",
+            "-video_track_timescale", str(fps * 1000),
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-movflags", "+faststart", str(out)]
     # -ss and -t BEFORE -i bound the SOURCE range so setpts can compress to sdur.
@@ -618,6 +624,18 @@ def run_checks(cfg, segs, blocks, edit, preview):
     print(f"  [INFO] captions: {ndlg} cue(s)" +
           ("" if ndlg else " — none (fine for a no-speech montage; verify if you expected some)"))
 
+    # canvas spine: a wrong-resolution/fps render passes duration+loudness but is unpostable.
+    wh = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height,r_frame_rate", "-of", "csv=p=0", str(out)],
+        capture_output=True, text=True).stdout.strip().split(",")
+    ow, oh = (int(wh[0]), int(wh[1])) if len(wh) >= 2 else (0, 0)
+    num, den = (wh[2].split("/") + ["1"])[:2] if len(wh) >= 3 and "/" in wh[2] else ("0", "1")
+    ofps = round(float(num) / float(den))  # r_frame_rate is "30/1"
+    check("canvas is spec WxH", (ow, oh) == (cfg["width"], cfg["height"]),
+          f"got {ow}x{oh} vs {cfg['width']}x{cfg['height']}")
+    check("fps matches spec", ofps == cfg["fps"], f"got {ofps} vs {cfg['fps']}")
+
     print("  " + ("ALL CHECKS PASSED" if passed else "CHECKS FAILED"))
     return passed
 
@@ -680,12 +698,18 @@ def main():
 
     print("4) composite (xfade chain -> title -> captions LAST)")
     ts = cfg["title_seconds"]
-    vp, cur = [], "[0:v]"
+    # Normalize every block's frame rate + timebase before the xfade chain. concat -c copy can
+    # leave a multi-clip block reporting avg_frame_rate 30000/1001 (inferred from a 29.97 source's
+    # timestamps) while a single-seg block stays 30/1 — and xfade rejects mismatched input frame
+    # rates ("do not match", error 234 / -22). fps + settb re-stamp both sides so any block mix joins.
+    for j in range(n):
+        vp.append(f"[{j}:v]fps={cfg['fps']},settb=AVTB[b{j}]")
+    cur = "[b0]"
     xft = cfg.get("xfade_types") or []   # per-join transition; else the single xfade_type
     for j in range(1, n):
         nl = f"[xv{j}]"
         tr = xft[j - 1] if j - 1 < len(xft) else cfg["xfade_type"]
-        vp.append(f"{cur}[{j}:v]xfade=transition={tr}:duration={XF}:"
+        vp.append(f"{cur}[b{j}]xfade=transition={tr}:duration={XF}:"
                   f"offset={xf_off[j]:.3f}{nl}"); cur = nl
     if has_title:
         ti = n  # title.png is appended as input index n, after the n block inputs

@@ -57,6 +57,15 @@ plus:
 4. **Per-segment extract → lossless `-c copy` concat for blocks**, then ONE final encode
    for xfade+title+captions. Don't single-pass the whole thing from sources — you lose the
    clean block boundaries and re-encode more than once.
+   - **Mixed source framerates break the block xfade (error 234 / -22 "frame rates do not
+     match").** Phone clips are commonly a mix of 30/1 and 29.97 (30000/1001). Two defenses,
+     both in `build.py` — keep them: (a) `extract` pins every seg to CFR with `-fps_mode cfr` +
+     `-video_track_timescale`, so timebases are uniform; (b) the composite pre-normalizes every
+     block input with `[j:v]fps=<fps>,settb=AVTB[bj]` before the xfade chain, because
+     `concat -c copy` re-infers a multi-clip block's `avg_frame_rate` as 30000/1001 while a
+     single-seg block stays 30/1, and `xfade` compares input frame rates. `--check` asserts the
+     final canvas WxH + fps, but it runs AFTER the render — a frame-rate mismatch fails the
+     render itself, so the fix must live in extract/composite, not the gate.
 5. **≤30ms audio fades at every segment edge** (`afade` in/out, d=0.03, auto-shrunk toward
    half-length for sub-60ms clips so the in/out fades never overlap). Prevents pops at the
    hard cuts inside a block. Block joins use `acrossfade` (the xfade handles the seam).
