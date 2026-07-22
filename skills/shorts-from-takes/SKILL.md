@@ -82,6 +82,12 @@ how warm, font size — are judgment calls made by looking at the footage.
   `timeline_view.py`) for the visual read — a transcript can't show look-aways or energy. Rank
   takes per beat: a fatal error (a mis-spoken product name / CTA) disqualifies first; among the
   clean takes pick the highest energy/delivery; break ties on the cleaner cut point.
+- **Loudness-scan every candidate span before the first render**
+  (`ffmpeg -ss <start> -t <dur> -af loudnorm=print_format=json -f null -`). Takes recorded
+  without the mic in hand (both hands on a prop, filming a screen) run 15–20 LU under the
+  rest, and global loudnorm can't fix imbalance *between* segments. Level them with per-seg
+  `gain` (pure dB — voice character untouched). Found after render one, this costs a full
+  re-render; found here, it's one spec field.
 
 ### 2. Select + order the clips + confirm the plan (judgment — do NOT skip)
 - Choose the best clip/take per beat and order them so they flow. Drill into specific moments
@@ -94,8 +100,12 @@ how warm, font size — are judgment calls made by looking at the footage.
 
 ### 3. Write the spec + render
 - Copy `scripts/spec.example.json`, fill `segments` (`src`/`start`/`end`, optional
-  `kind`/`grade`/`fit`/`beat`), `blocks` (group consecutive same-orientation clips; a crossfade
-  fires between blocks), `title`, `name_fix`, `version`.
+  `kind`/`grade`/`fit`/`beat`, per-seg `gain` for mic-less takes, per-seg `zoom` `[z0,z1]`
+  for animated push-ins/pull-backs), `blocks` (group consecutive same-orientation clips; a
+  crossfade fires between blocks), `title`, `name_fix`, `version`. Optional extras:
+  `highlight_words` + `captions.highlight` (tint key words), `top_titles` (beat labels at the
+  top safe zone), `inserts` (image B-roll glimpses). All documented in
+  `references/render-notes.md`.
 - Preview: `python scripts/build.py <spec.json> --preview`
 - Final:   `python scripts/build.py <spec.json>`
 - See `references/render-notes.md` for the spec schema, the production-correctness rules,
