@@ -1,11 +1,14 @@
 # skills for content creators
 
-A small collection of [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
-for turning raw footage into finished, ready-to-post content. These are usable by any agent that supports skills.
+![GitHub stars](https://img.shields.io/github/stars/nidhi-singh02/skills?style=flat-square)
+![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
+![Agent Skills](https://img.shields.io/badge/agent-skills-8A2BE2?style=flat-square)
 
-[Subscribe To My YouTube Channel](https://www.youtube.com/@NidhiSinghAttri?sub_confirmation=1)
+A collection of [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview) that turn raw footage into finished, ready-to-post content. Usable by any agent that supports skills — Claude Code, Codex, Cursor, and more.
 
-## Skills
+Built by a solo creator who got tired of manually editing every Short, article, and caption. These are the exact workflows I use for my own channel.
+
+## What you get
 
 | Skill | What it does |
 |-------|--------------|
@@ -15,21 +18,27 @@ for turning raw footage into finished, ready-to-post content. These are usable b
 
 ## Quickstart (30-second setup)
 
-1. Run the skills.sh installer: 
 ```bash
 npx skills@latest add nidhi-singh02/skills
 ```
 
-2. Pick the skills you want, and which coding agents you want to install them on.
+Pick the skills you want and which coding agents to install them on. Then just ask for the thing the skill does:
 
-Then in Claude Code/Codex/Cursor, just ask for the thing the skill does (e.g.
-*"cut a Short from these clips"* or *"turn this video into a Medium article"*) —
-it triggers automatically from its description. Each skill's own README covers
-its prerequisites and usage.
+```
+"cut a Short from these clips"
+"turn this video into a Medium article"
+```
 
-## shorts-from-takes video walkthrough
+It triggers automatically from its description. Each skill's own README covers prerequisites and usage.
 
-This walkthrough covers installation, how to use the skill, and the complete workflow for
-turning multiple shots or takes into a finished Short.
+## Why agent skills
+
+Skills are the missing glue between "I have a workflow" and "my agent does it for me." Instead of re-explaining your process every session, you install it once and the agent knows how to do it. This repo is a working example of that pattern, built and tested in real production use (every Short on my channel went through these).
+
+## Video walkthrough
 
 [![Watch the shorts-from-takes installation and usage walkthrough](https://img.youtube.com/vi/bTORVA83vSI/maxresdefault.jpg)](https://youtu.be/bTORVA83vSI)
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled fonts keep their own licenses, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
