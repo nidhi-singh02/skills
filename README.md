@@ -8,6 +8,8 @@ A collection of [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/
 
 Built by a solo creator who got tired of manually editing every Short, article, and caption. These are the exact workflows I use for my own channel.
 
+[Subscribe To My YouTube Channel](https://www.youtube.com/@NidhiSinghAttri?sub_confirmation=1)
+
 ## What you get
 
 | Skill | What it does |
