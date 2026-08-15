@@ -3,6 +3,6 @@
 # https://agentskills.io/specification
 fail=0
 for d in skills/*/; do
-  npx -y skills-ref validate "$d" || fail=1
+  npx -y skills-ref@0.1.5 validate "$d" || fail=1
 done
 exit $fail
