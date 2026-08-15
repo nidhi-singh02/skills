@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: validate-agent-skills
+        name: validate agent skills (agentskills.io spec)
+        entry: scripts/validate_skills.sh
+        language: system
+        files: ^skills/[^/]+/SKILL\.md$
+        pass_filenames: false

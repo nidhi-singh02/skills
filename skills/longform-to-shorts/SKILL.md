@@ -9,6 +9,8 @@ description: >
   video into its own clip", "clip this up for tiktok/reels". Uses ffmpeg + a transcription skill for word
   timings. Do NOT use for raw multi-take footage (use shorts-from-takes) or a single freeform edit; this is
   specifically finished-long-form -> many standalone verticals.
+license: MIT
+compatibility: Requires ffmpeg, ffprobe, and Python 3, plus a transcription skill that returns word-level timings (e.g. Whisper).
 allowed-tools: Bash, Read, Write, Edit
 ---
 

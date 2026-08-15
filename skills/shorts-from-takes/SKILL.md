@@ -12,6 +12,8 @@ description: >-
   as a Short. Opinionated layer ON TOP OF `video-use` — use video-use for a freeform
   single-video edit; cede to `video-to-articles` for a written post/article and
   `linkedin-carousel` for a slide/PDF carousel.
+license: MIT
+compatibility: Requires ffmpeg, ffprobe, and Python 3 with pillow; optionally uses the video-use skill for transcription and loudness helpers.
 ---
 
 # Shorts From Takes

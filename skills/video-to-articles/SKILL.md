@@ -1,6 +1,5 @@
 ---
 name: video-to-articles
-version: 1.2.0
 description: >-
   Convert a recorded video (talking-head, build-along, tutorial, demo, essay, vlog) into a
   ready-to-post article or post for X (Twitter), Medium, or LinkedIn: a copy-paste pack (markdown +
@@ -12,6 +11,11 @@ description: >-
   for: summarizing or taking notes on a video (this ships a publish-ready post), YouTube
   titles/descriptions/thumbnails, cutting shorts/reels, transcribing a video, scheduling/posting,
   or a swipeable LinkedIn carousel (separate skill).
+license: MIT
+compatibility: Requires Python 3 for its scripts; cover rendering uses a Playwright MCP browser when available and degrades gracefully without one.
+metadata:
+  author: Nidhi Singh
+  version: "1.2.0"
 ---
 
 # Video → article (X / Medium / LinkedIn)
