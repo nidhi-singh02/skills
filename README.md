@@ -41,6 +41,23 @@ Skills are the missing glue between "I have a workflow" and "my agent does it fo
 
 [![Watch the shorts-from-takes installation and usage walkthrough](https://img.youtube.com/vi/bTORVA83vSI/maxresdefault.jpg)](https://youtu.be/bTORVA83vSI)
 
+## Contributing
+
+Skill frontmatter is validated against the [Agent Skills spec](https://agentskills.io/specification) on every pull request (`.github/workflows/validate-skills.yml`). Run the same check locally:
+
+```bash
+./scripts/validate_skills.sh
+```
+
+You can also wire it into your git pre-commit hook (one-time setup; Node is required for `npx`):
+
+```bash
+pip install pre-commit   # or: brew install pre-commit
+pre-commit install
+```
+
+After that, the validator runs automatically whenever a `SKILL.md` is staged.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Bundled fonts keep their own licenses, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
