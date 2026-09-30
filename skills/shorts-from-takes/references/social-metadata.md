@@ -17,7 +17,7 @@ Algorithm: CTR + retention ("Quality CTR" — high click but low 15–30s retent
   (mark `[add link]`), then a comment-bait question + follow CTA, then 3 hashtags.
 - **Tags:** ~15–25 comma-separated (minor signal now; relevance > volume).
 - **Hashtags:** 3 above the title (`#AI #Coding #Shorts`) + ≤~10 total.
-- **Thumbnail:** 3–4 ideas, ≤4 words, expressive face, high contrast, brand accent.
+- **Thumbnail:** 3–4 ideas, ≤4 words, expressive face, high contrast, brand accent. Deliver ONLY vertical 1080x1920 covers for Shorts (no 1280x720 landscape thumbnail; that is long-form only).
 
 ## Instagram (Reels)
 Algorithm: SHARES (DM sends weighted 3–5× over likes) + saves + watch time. Captions/on-screen

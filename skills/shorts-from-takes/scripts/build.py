@@ -65,7 +65,7 @@ DEFAULTS = {
     "top_titles": [],             # beat labels: [{"start","end","text","colour"?,"fontsize"?}]
                                   # (output seconds), rendered top-center via the ASS Top style
     "top_title_marginv": 210,     # Top style margin FROM THE TOP — below platform UI chrome
-    "inserts": [],                # image B-roll overlays: [{"file","start","end","x","y"}]
+    "inserts": [],                # image B-roll overlays: [{"file","start","end","x","y","zoom"?}]
                                   # (output seconds), alpha-faded, drawn under the captions
     # video-use helpers dir (OPTIONAL — only its 2-pass loudnorm is borrowed). Leave
     # null to auto-resolve from $VIDEO_USE_HELPERS / common paths, else the built-in
@@ -512,8 +512,11 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
                 # highlight_words: retint this word's karaoke fill via \1c (the \kf sweep
                 # fills toward PrimaryColour, so overriding \1c changes the sung colour);
                 # restore the style's primary right after so following words are untouched.
-                tint = f"\\1c{hlc.replace('&H00', '&H')}" if hlc and txts[wi] in hl else ""
-                untint = f"{{\\1c{c['primary'].replace('&H00', '&H')}}}" if tint else ""
+                hx = hlc.replace('&H00', '&H') if hlc else ""
+                # tint both fill (\\1c) and pre-fill (\\2c) so the word never shows half-swept
+                tint = f"\\1c{hx}\\2c{hx}" if hlc and txts[wi] in hl else ""
+                untint = (f"{{\\1c{c['primary'].replace('&H00', '&H')}"
+                          f"\\2c{c['secondary'].replace('&H00', '&H')}}}") if tint else ""
                 parts.append(f"{{\\kf{int(round(d*100))}{tint}}}{txts[wi]}{untint}{sep}")
                 cursor = we
             # a cue may not outlive the NEXT cue's start: the +0.12 hang otherwise
@@ -547,38 +550,65 @@ def build_ass(segs, offsets, cfg, edit, out: Path, fonts_dir: Path = None):
 
 def make_title(cfg, fonts_dir, out: Path):
     from PIL import Image, ImageDraw, ImageFont
-    W = cfg["width"]; H = 460
+    W = cfg["width"]; k = W / 1080; H = int(460 * k)  # title geometry scales with output width
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
-    fpath = str(fonts_dir / cfg["captions"]["fontfile"])
+    # The title may use its own face so it reads as a separate layer from the captions.
+    # "title_fontfile" is either a bare name inside fonts_dir or an absolute path;
+    # "title_font_index" picks a face out of a .ttc collection. Falls back to the
+    # caption font, so specs that don't set it render exactly as before.
+    tf = cfg.get("title_fontfile") or cfg["captions"]["fontfile"]
+    tfp = Path(tf)
+    fpath = str(tfp if tfp.is_absolute() else fonts_dir / tf)
+    tidx = int(cfg.get("title_font_index", 0))
+    size = int(cfg.get("title_fontsize", 84 * k))
+
+    def _load(p, s, i):
+        return ImageFont.truetype(p, s, index=i) if i else ImageFont.truetype(p, s)
+
     try:
-        font = ImageFont.truetype(fpath, 84)
+        font = _load(fpath, size, tidx)
     except Exception:
         # The bundled font should always load; if a custom fonts_dir is missing it,
         # degrade cross-platform (never a hardcoded OS font path — that breaks off macOS).
         try:
-            font = ImageFont.truetype(str(fonts_dir / "Montserrat-Black.ttf"), 84)
+            fpath, tidx = str(fonts_dir / "Montserrat-Black.ttf"), 0
+            font = _load(fpath, size, tidx)
         except Exception:
             font = ImageFont.load_default()
+    # Shrink to fit: a forced "\n" line must not be re-wrapped by width, so the face
+    # is scaled down until every forced line clears the card instead.
+    forced = [ln for ln in cfg["title"].upper().split("\n") if ln.strip()]
+    if forced and hasattr(font, "path"):
+        while size > 30 and max(d.textlength(ln, font=font) for ln in forced) > W - 140 * k:
+            size -= 2
+            font = _load(fpath, size, tidx)
     title = cfg["title"].upper()
-    words = title.split(); lines, cur = [], ""
-    for w in words:
-        test = (cur + " " + w).strip()
-        if d.textlength(test, font=font) > W - 140 and cur:
-            lines.append(cur); cur = w
-        else:
-            cur = test
-    if cur:
-        lines.append(cur)
-    asc, desc = font.getmetrics(); lh = asc + desc + 10
+    # An explicit "\n" in the title forces a line break; each forced line is still
+    # word-wrapped if it overflows the card width.
+    lines = []
+    for para in title.split("\n"):
+        cur = ""
+        for w in para.split():
+            test = (cur + " " + w).strip()
+            if d.textlength(test, font=font) > W - 140 * k and cur:
+                lines.append(cur); cur = w
+            else:
+                cur = test
+        if cur:
+            lines.append(cur)
+    asc, desc = font.getmetrics(); lh = asc + desc + int(10 * k)
     tw = max(d.textlength(ln, font=font) for ln in lines)
-    bx, by = (W - tw - 84) / 2, (H - lh * len(lines) - 52) / 2
-    d.rounded_rectangle([bx, by, bx + tw + 84, by + lh * len(lines) + 52],
-                        radius=28, fill=(0, 0, 0, 150))
-    y = by + 26
-    for ln in lines:
+    bx, by = (W - tw - 84 * k) / 2, (H - lh * len(lines) - 52 * k) / 2
+    d.rounded_rectangle([bx, by, bx + tw + 84 * k, by + lh * len(lines) + 52 * k],
+                        radius=int(28 * k), fill=(0, 0, 0, 150))
+    y = by + 26 * k
+    for li, ln in enumerate(lines):
         x = (W - d.textlength(ln, font=font)) / 2
-        d.text((x + 2, y + 3), ln, font=font, fill=(0, 0, 0, 170))
-        d.text((x, y), ln, font=font, fill=(255, 255, 255, 255))
+        d.text((x + 2 * k, y + 3 * k), ln, font=font, fill=(0, 0, 0, 170))
+        # title_colours: per-line hex list (last one repeats); default white
+        tc = cfg.get("title_colours") or ["#FFFFFF"]
+        hx = tc[min(li, len(tc) - 1)].lstrip("#")
+        d.text((x, y), ln, font=font, fill=tuple(int(hx[k:k + 2], 16) for k in (0, 2, 4)) + (255,))
         y += lh
     img.save(out)
     print(f"  title.png ({len(lines)} line(s))")
@@ -668,7 +698,18 @@ def main():
 
     clips = edit / "clips"; clips.mkdir(parents=True, exist_ok=True)
     print("1) extract segments")
-    paths = [extract(s, i, cfg, clips, preview) for i, s in enumerate(segs)]
+    def cached_extract(s, i):
+        # reuse a segment when its inputs are unchanged (renders from 4K sources are slow)
+        key = json.dumps([{k: v for k, v in s.items() if k != "_i"}, cfg["speed"], cfg["fps"],
+                          cfg["width"], cfg["height"], cfg["denoise"], cfg["grade_filter"],
+                          preview], sort_keys=True)
+        out, kf = clips / f"seg_{i}.mp4", clips / f"seg_{i}.key"
+        if out.exists() and kf.exists() and kf.read_text() == key:
+            print(f"  seg{i} cached")
+            return out
+        p = extract(s, i, cfg, clips, preview); kf.write_text(key)
+        return p
+    paths = [cached_extract(s, i) for i, s in enumerate(segs)]
     m = [dur(p) for p in paths]
 
     print("2) blocks + xfade timing")
@@ -698,6 +739,7 @@ def main():
 
     print("4) composite (xfade chain -> title -> captions LAST)")
     ts = cfg["title_seconds"]
+    vp = []
     # Normalize every block's frame rate + timebase before the xfade chain. concat -c copy can
     # leave a multi-clip block reporting avg_frame_rate 30000/1001 (inferred from a 29.97 source's
     # timestamps) while a single-seg block stays 30/1 — and xfade rejects mismatched input frame
@@ -715,15 +757,28 @@ def main():
         ti = n  # title.png is appended as input index n, after the n block inputs
         vp.append(f"[{ti}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,"
                   f"fade=t=out:st={ts-0.3:.2f}:d=0.3:alpha=1[ttl]")
-        vp.append(f"{cur}[ttl]overlay=(W-w)/2:110:enable='between(t,0,{ts})'[v1]")
+        vp.append(f"{cur}[ttl]overlay=(W-w)/2:{int(110 * cfg['width'] / 1080)}:enable='between(t,0,{ts})'[v1]")
         cur = "[v1]"
     # image inserts — B-roll glimpses (a screenshot, a chart, a doc snippet) floated
     # over the video: [{"file","start","end","x","y"}] in OUTPUT seconds. 0.15s alpha
     # fades in/out; applied before the ass filter so captions always draw on top.
+    # Optional "zoom": [from, to] adds a ken-burns move across the visible window so
+    # the still doesn't read as a frozen JPEG. Output size stays the source size, so
+    # x/y placement is unaffected; zoom > 1 crops toward the image centre.
     ins_base = n + (1 if has_title else 0)
     for m_i, ins in enumerate(cfg.get("inserts", [])):
         st, en = float(ins["start"]), float(ins["end"])
-        vp.append(f"[{ins_base + m_i}:v]format=rgba,"
+        pre = ""
+        if ins.get("zoom"):
+            z0, z1 = float(ins["zoom"][0]), float(ins["zoom"][1])
+            iw, ih = probe_wh(ins["file"])
+            fps = cfg["fps"]
+            f0, span = st * fps, max(1.0, (en - st) * fps)
+            # inputs are fed at cfg fps (see -framerate below), so `on` == output frame
+            zexp = f"{z0}+({z1}-{z0})*clip((on-{f0:.0f})/{span:.0f},0,1)"
+            pre = (f"zoompan=z='{zexp}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+                   f"d=1:s={iw}x{ih}:fps={fps},")
+        vp.append(f"[{ins_base + m_i}:v]{pre}format=rgba,"
                   f"fade=t=in:st={st:.2f}:d=0.15:alpha=1,"
                   f"fade=t=out:st={en - 0.15:.2f}:d=0.15:alpha=1[ins{m_i}]")
         vp.append(f"{cur}[ins{m_i}]overlay={ins['x']}:{ins['y']}:"
@@ -748,7 +803,8 @@ def main():
     if has_title:
         cmd += ["-loop", "1", "-t", f"{ts}", "-i", str(edit / "title.png")]
     for ins in cfg.get("inserts", []):
-        cmd += ["-loop", "1", "-t", f"{float(ins['end']) + 0.5:.2f}", "-i", str(ins["file"])]
+        cmd += ["-loop", "1", "-framerate", str(cfg["fps"]),
+                "-t", f"{float(ins['end']) + 0.5:.2f}", "-i", str(ins["file"])]
     cmd += ["-filter_complex", fc, "-map", "[outv]", "-map", amap,
             "-c:v", "libx264", "-preset", "fast", "-crf", crf, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
