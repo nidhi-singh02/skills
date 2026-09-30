@@ -130,6 +130,15 @@ Write platform-tuned metadata to `<edit>/social_metadata.md` per
 (the "when asked" fourth platform), each to that platform's CURRENT algorithm. Research current
 trends first (web search); the reference encodes the durable rules but trends move.
 
+## Helper scripts
+- `scripts/snap_cuts.py` — `snap` a cut into real silence, find mic `dropout`s before choosing takes, measure span `levels` for per-segment `gain`.
+- `scripts/camera.py` — virtual camera: landscape screen recording -> readable 9:16 pan/zoom clips (edit `SHOTS`).
+- `scripts/overlay_kit.py` — PIL drawers for captions (presets), a title with scrim, and a CTA card.
+- `scripts/verify_1x.py` — slow a finished render back to 1x and re-transcribe locally (whisper) to catch misheard or clipped words.
+- `scripts/frame_check.py` — contact sheet of frames at every cut and the first/last 2s.
+- `references/lessons.md` — rules that each cost a re-render. Read before the first render.
+- `references/voice-profile-template.md` — optional: save a filled copy as `~/.claude/voice-profile.md` and write titles/captions in your voice.
+
 ## Files
 - `scripts/build.py` — the render engine (reads a spec.json; `--preview` and `--check` modes).
   Self-contained: borrows video-use's loudnorm if present, else uses a built-in 2-pass.
