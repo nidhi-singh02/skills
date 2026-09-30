@@ -30,6 +30,9 @@ Common overrides (else house-style defaults in `build.py`):
   in OUTPUT seconds) + `top_title_marginv`, `inserts` (image B-roll overlays
   `[{"file","start","end","x","y"}]`, alpha-faded, drawn under the captions),
   `video_use_helpers`.
+- Title styling: `title_fontfile` (bare name in the fonts dir, or an absolute path), `title_font_index` (face inside a `.ttc`), `title_fontsize` (default scales with output width), `title_colours` (per-line hex list, last repeats; default white). An explicit `\n` in `title` forces a line break, and the title shrinks to fit the card.
+- Inserts also accept `zoom` `[from, to]`: a ken-burns move across the visible window so a still doesn't read as a frozen image.
+- Unchanged segments are cached (`clips/seg_N.key`), so re-renders from 4K sources only redo edited segments.
 
 Per-segment extras (inside a `segments[]` entry): `marginv`, `crop`, `bg_crop`, `grade`, `fit`,
 plus:
